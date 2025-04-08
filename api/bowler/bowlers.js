@@ -64,5 +64,7 @@ export default async function handler(req, res) {
     console.error('API handler: Error occurred -', error.message);
     console.error('API handler: Full error -', error);
     return res.status(500).json({ message: `Failed to fetch bowlers: ${error.message}` });
+
+   //Test 
   }
 }
