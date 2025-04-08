@@ -23,9 +23,6 @@ export default async function handler(req, res) {
     
     console.log('API handler: Parsing JSON config');
     const config = JSON.parse(configFile);
-    console.log('API handler: Config object -', config);
-
-    console.log('API handler: bowlerMacroId from config -', config.bowlerMacroId);
     
     // IMPORTANT FIX: This line has a bug - you're trying to destructure from config.bowlerMacroId
     // But bowlerMacroId is likely a string value, not an object containing another bowlerMacroId property
@@ -33,7 +30,6 @@ export default async function handler(req, res) {
     
     // CORRECTED LINE:
     const bowlerMacroId = config.bowlerMacroId; // Direct access, no destructuring needed
-    console.log('API handler: Final bowlerMacroId value -', bowlerMacroId);
     
     if (!bowlerMacroId) {
       console.error('API handler: bowlerMacroId is missing or undefined');
