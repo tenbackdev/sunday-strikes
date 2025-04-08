@@ -1,25 +1,30 @@
-import logo from './logo.svg';
-import './App.css';
+import React, { useState } from 'react';
+import Header from './components/Header';
+import Games from './components/Games';
+import History from './components/History';
+import Account from './components/Account';
+import Footer from './components/Footer';
 
-function App() {
+const App = () => {
+  const [activeSection, setActiveSection] = useState('Games');
+
+  const handleNavigation = (section) => {
+    setActiveSection(section);
+  };
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+    <div className="flex flex-col min-h-screen bg-gray-50 pt-20">
+      <Header onNavigate={handleNavigation} />
+      
+      <main className="flex-grow container mx-auto p-4">
+        {activeSection === 'Games' && <Games />}
+        {activeSection === 'History' && <History />}
+        {activeSection === 'Account' && <Account />}
+      </main>
+      
+      <Footer />
     </div>
   );
-}
+};
 
 export default App;
