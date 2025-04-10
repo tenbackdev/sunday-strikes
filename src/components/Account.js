@@ -1,7 +1,6 @@
-// components/Account.jsx
 import React, { useState, useEffect } from 'react';
 
-const Account = () => {
+const Account = ({ currentBowlerId, onBowlerChange }) => {
   const [showRegisterForm, setShowRegisterForm] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [apiResponse, setApiResponse] = useState(null);
@@ -31,24 +30,21 @@ const Account = () => {
     };
   }, []);
 
-  // Fetch bowlers from API
-// In your Account.jsx component, modify the useEffect:
-useEffect(() => {
+  // Fetch bowlers from API and set the current bowler
+  useEffect(() => {
     const fetchBowlers = async () => {
       console.log('Component: Starting to fetch bowlers');
       try {
         setLoading(true);
         console.log('Component: Calling API endpoint');
         const response = await fetch('/api/bowler/bowlers', {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-            }
-          });
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
         
         console.log('Component: API response status:', response.status);
-        console.log(response.json);
-        console.log(response);
         
         if (!response.ok) {
           console.error('Component: API returned error status:', response.status);
@@ -59,10 +55,26 @@ useEffect(() => {
         console.log('Component: Received data from API:', data);
         setBowlers(data);
         
-        // Set first bowler as current if available
+        // Set bowler based on currentBowlerId from props or first bowler if available
         if (data.length > 0) {
-          console.log('Component: Setting current bowler to first item in list');
-          setCurrentBowler(data[0]);
+          if (currentBowlerId) {
+            console.log('Component: Looking for bowler with ID:', currentBowlerId);
+            const savedBowler = data.find(bowler => bowler.bowlerId === currentBowlerId);
+            if (savedBowler) {
+              console.log('Component: Found saved bowler:', savedBowler);
+              setCurrentBowler(savedBowler);
+            } else {
+              console.log('Component: Saved bowler not found, using first bowler');
+              setCurrentBowler(data[0]);
+              // Update parent state with new bowler ID
+              onBowlerChange(data[0].bowlerId);
+            }
+          } else {
+            console.log('Component: No saved bowler ID, using first bowler');
+            setCurrentBowler(data[0]);
+            // Update parent state with new bowler ID
+            onBowlerChange(data[0].bowlerId);
+          }
         } else {
           console.log('Component: No bowlers received from API');
         }
@@ -77,7 +89,8 @@ useEffect(() => {
   
     console.log('Component: Account component mounted, initiating data fetch');
     fetchBowlers();
-  }, []);
+  }, [currentBowlerId, onBowlerChange]);
+
   const toggleRegisterForm = () => {
     setShowRegisterForm(!showRegisterForm);
     setApiResponse(null); // Clear any previous API responses
@@ -88,6 +101,17 @@ useEffect(() => {
     const selected = bowlers.find(bowler => bowler.bowlerId === selectedId);
     if (selected) {
       setCurrentBowler(selected);
+    }
+  };
+
+  const selectBowler = () => {
+    if (currentBowler) {
+      console.log('Component: User selected bowler with ID:', currentBowler.bowlerId);
+      onBowlerChange(currentBowler.bowlerId);
+      setApiResponse({
+        success: true,
+        message: `Selected ${currentBowler.firstName} ${currentBowler.lastName} as your active bowler`
+      });
     }
   };
 
@@ -123,6 +147,29 @@ useEffect(() => {
           lastName: '',
           email: ''
         });
+        
+        // Refresh bowler list to include the new bowler
+        const refreshResponse = await fetch('/api/bowler/bowlers', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+        
+        if (refreshResponse.ok) {
+          const refreshedData = await refreshResponse.json();
+          setBowlers(refreshedData);
+          
+          // Assuming the newly added bowler is the last one in the list
+          if (refreshedData.length > 0) {
+            const newBowler = refreshedData[refreshedData.length - 1];
+            setCurrentBowler(newBowler);
+            onBowlerChange(newBowler.bowlerId);
+          }
+        }
+        
+        // Hide the register form
+        setShowRegisterForm(false);
       }
     } catch (error) {
       setApiResponse({
@@ -282,11 +329,18 @@ useEffect(() => {
                   ))}
                 </select>
                 <button 
+                  onClick={selectBowler}
                   className="w-full md:w-auto bg-gray-800 hover:bg-gray-900 text-white px-6 py-2 rounded transition-colors"
                 >
                   Select Bowler
                 </button>
               </div>
+              {currentBowlerId === currentBowler.bowlerId && (
+                <div className="mt-2 text-green-600 text-sm flex items-center">
+                  <span className="w-2 h-2 rounded-full mr-2 bg-green-600"></span>
+                  <span>This bowler is currently selected</span>
+                </div>
+              )}
             </div>
           </>
         )}

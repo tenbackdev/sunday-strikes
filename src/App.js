@@ -12,13 +12,31 @@ const App = () => {
     return savedSection !== null ? savedSection : 'Games';
   });
 
+  // State to track the current selected bowler
+  const [currentBowlerId, setCurrentBowlerId] = useState(() => {
+    const savedBowlerId = localStorage.getItem('currentBowlerId');
+    return savedBowlerId !== null ? parseInt(savedBowlerId) : null;
+  });
+
   // Save activeSection to localStorage whenever it changes
   useEffect(() => {
     localStorage.setItem('activeSection', activeSection);
   }, [activeSection]);
 
+  // Save currentBowlerId to localStorage whenever it changes
+  useEffect(() => {
+    if (currentBowlerId !== null) {
+      localStorage.setItem('currentBowlerId', currentBowlerId);
+    }
+  }, [currentBowlerId]);
+
   const handleNavigation = (section) => {
     setActiveSection(section);
+  };
+
+  const handleBowlerChange = (bowlerId) => {
+    console.log('App: Setting current bowler ID to:', bowlerId);
+    setCurrentBowlerId(bowlerId);
   };
 
   return (
@@ -26,9 +44,14 @@ const App = () => {
       <Header onNavigate={handleNavigation} activeSection={activeSection} />
       
       <main className="flex-grow container mx-auto p-4">
-        {activeSection === 'Games' && <Games />}
-        {activeSection === 'History' && <History />}
-        {activeSection === 'Account' && <Account />}
+        {activeSection === 'Games' && <Games currentBowlerId={currentBowlerId} />}
+        {activeSection === 'History' && <History currentBowlerId={currentBowlerId} />}
+        {activeSection === 'Account' && 
+          <Account 
+            currentBowlerId={currentBowlerId} 
+            onBowlerChange={handleBowlerChange} 
+          />
+        }
       </main>
       
       <Footer />
