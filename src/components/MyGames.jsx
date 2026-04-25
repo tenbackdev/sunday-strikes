@@ -265,7 +265,7 @@ function GameCard({ game, expanded, onToggle, onEdit, onDelete }) {
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm min-w-[300px]">
       <div className="flex w-full items-center gap-3 px-4 py-3">
         {/* Score bubble */}
         <button

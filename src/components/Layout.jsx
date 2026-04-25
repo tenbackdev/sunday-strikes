@@ -53,23 +53,6 @@ function SidebarNav({ activePage, setActivePage, onNavClick }) {
   )
 }
 
-function SidebarFooter() {
-  return (
-    <div className="border-t border-white/10 px-3 py-3">
-      <button
-        onClick={() => supabase.auth.signOut()}
-        className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-400 hover:bg-white/10 hover:text-white transition-colors"
-      >
-        <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-          <polyline points="16 17 21 12 16 7"/>
-          <line x1="21" y1="12" x2="9" y2="12"/>
-        </svg>
-        Sign out
-      </button>
-    </div>
-  )
-}
 
 function SidebarHeader() {
   return (
@@ -94,7 +77,6 @@ export default function Layout({ session }) {
         <div className="flex-1 overflow-y-auto">
           <SidebarNav activePage={activePage} setActivePage={setActivePage} />
         </div>
-        <SidebarFooter />
       </aside>
 
       {/* Mobile sidebar — slide-in overlay */}
@@ -124,7 +106,6 @@ export default function Layout({ session }) {
             <div className="flex-1 overflow-y-auto">
               <SidebarNav activePage={activePage} setActivePage={setActivePage} onNavClick={() => setMobileOpen(false)} />
             </div>
-            <SidebarFooter />
           </aside>
         </div>
       )}
