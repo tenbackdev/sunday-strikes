@@ -97,10 +97,15 @@ export default function FindFriends({ session }) {
     )
   }
 
+  const friends = myRequests
+    .filter(r => r.status === 'accepted')
+    .map(r => r.sender_id === session.user.id ? r.receiver : r.sender)
+    .filter(Boolean)
+
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-gray-900">Find Friends</h2>
+        <h2 className="text-xl font-bold text-gray-900">Friends</h2>
         <p className="mt-1 text-sm text-gray-500">Search for bowlers by name or email address</p>
       </div>
 
@@ -120,27 +125,27 @@ export default function FindFriends({ session }) {
         />
       </div>
 
-      {query.trim() && (
-        <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
-          {searching ? (
-            <div className="flex items-center justify-center py-10 text-sm text-gray-400">Searching…</div>
-          ) : results.length === 0 ? (
-            <div className="flex items-center justify-center py-10 text-sm text-gray-400">No users found for "{query}"</div>
-          ) : (
-            <ul className="divide-y divide-gray-50">
-              {results.map(profile => {
-                const req = getRequestStatus(profile.id)
-                return (
-                  <li key={profile.id} className="flex items-center justify-between px-4 py-3.5">
-                    <ProfileRow profile={profile} />
-                    <FriendButton req={req} onSend={() => sendRequest(profile.id)} onRespond={respondToRequest} />
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-        </div>
-      )}
+      <div className="rounded-xl border border-gray-100 bg-white shadow-sm" style={{ minHeight: '10rem' }}>
+        {!query.trim() ? (
+          <div className="flex items-center justify-center py-10 text-sm text-gray-300">Start typing to search</div>
+        ) : searching ? (
+          <div className="flex items-center justify-center py-10 text-sm text-gray-400">Searching…</div>
+        ) : results.length === 0 ? (
+          <div className="flex items-center justify-center py-10 text-sm text-gray-400">No users found for "{query}"</div>
+        ) : (
+          <ul className="max-h-64 divide-y divide-gray-50 overflow-y-auto">
+            {results.map(profile => {
+              const req = getRequestStatus(profile.id)
+              return (
+                <li key={profile.id} className="flex items-center justify-between px-4 py-3.5">
+                  <ProfileRow profile={profile} />
+                  <FriendButton req={req} onSend={() => sendRequest(profile.id)} onRespond={respondToRequest} />
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </div>
 
       {!loadingRequests && incomingRequests.length > 0 && (
         <div>
@@ -175,6 +180,32 @@ export default function FindFriends({ session }) {
           </div>
         </div>
       )}
+
+      <div>
+        <div className="mb-3 flex items-center gap-2">
+          <h3 className="text-sm font-semibold text-gray-700">My Friends</h3>
+          {!loadingRequests && (
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
+              {friends.length}
+            </span>
+          )}
+        </div>
+        <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
+          {loadingRequests ? (
+            <div className="flex items-center justify-center py-10 text-sm text-gray-400">Loading…</div>
+          ) : friends.length === 0 ? (
+            <div className="flex items-center justify-center py-10 text-sm text-gray-400">No friends yet — search above to add some!</div>
+          ) : (
+            <ul className="divide-y divide-gray-50">
+              {friends.map(profile => (
+                <li key={profile.id} className="px-4 py-3.5">
+                  <ProfileRow profile={profile} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

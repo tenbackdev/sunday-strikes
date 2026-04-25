@@ -21,7 +21,7 @@ const NAV_ITEMS = [
   },
   {
     id: 'find-friends',
-    label: 'Find Friends',
+    label: 'Friends',
     icon: (
       <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
