@@ -2,239 +2,58 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { parseScorecard } from '../lib/gemini'
 import { computeStats, computeScores } from '../lib/parseGame'
+import { BallMark, EditableBallInput, StatTable, FrameGrid, EditableFrameGrid } from './Scorecard'
+import VSSubmitModal from './VSSubmitModal'
 
-// ── Ball mark (display only) ─────────────────────────────────────────────────
+// ── Day summary helper ───────────────────────────────────────────────────────
 
-function BallMark({ value }) {
-  if (value === 'X') return <span className="font-bold text-red-500">X</span>
-  if (value === '/') return <span className="font-bold text-blue-500">/</span>
-  if (value === '-') return <span className="text-gray-400">-</span>
-  return <span className="text-gray-700">{value}</span>
+function computeDaySummary(games) {
+  const count = games.length
+  const scores = games.map(g => g.total_score)
+  const totalPins = scores.reduce((s, v) => s + v, 0)
+  const splits = games.reduce((s, g) => s + (g.frames?.filter(f => f?.split).length ?? 0), 0)
+  const converted = games.reduce((s, g) => s + (g.frames?.filter(f => f?.split && f?.splitPickedUp).length ?? 0), 0)
+  return {
+    count,
+    totalPins,
+    avgScore: count > 0 ? Math.round(totalPins / count) : 0,
+    highScore: count > 0 ? Math.max(...scores) : 0,
+    lowScore: count > 0 ? Math.min(...scores) : 0,
+    strikes: games.reduce((s, g) => s + (g.strikes ?? 0), 0),
+    spares: games.reduce((s, g) => s + (g.spares ?? 0), 0),
+    opens: games.reduce((s, g) => s + (g.opens ?? 0), 0),
+    splits,
+    converted,
+  }
 }
 
-// ── Editable ball input ──────────────────────────────────────────────────────
-
-function EditableBallInput({ value, onChange, disabled }) {
-  const color =
-    value === 'X' ? 'text-red-500 border-red-200 bg-red-50' :
-    value === '/' ? 'text-blue-500 border-blue-200 bg-blue-50' :
-    value === '-' ? 'text-gray-400 border-gray-100 bg-gray-50' :
-    'text-gray-700 border-gray-200 bg-white'
-
+function DaySummary({ games }) {
+  const s = computeDaySummary(games)
   return (
-    <input
-      type="text"
-      value={value ?? ''}
-      disabled={disabled}
-      onChange={e => {
-        let raw = e.target.value.toUpperCase()
-        if (raw === '0') raw = '-'
-        else if (raw === '10') raw = 'X'
-        else raw = raw.slice(-1)
-        if (raw === '' || /^[X\/\-1-9]$/.test(raw)) onChange(raw)
-      }}
-      className={`w-7 h-7 rounded border text-center text-xs font-bold outline-none transition-colors
-        ${color}
-        ${disabled ? 'opacity-25 cursor-not-allowed' : 'focus:ring-1 focus:ring-slate-400'}`}
-    />
-  )
-}
-
-// ── Stat table ───────────────────────────────────────────────────────────────
-
-function StatTable({ strikes, spares, opens, initialRun, frames }) {
-  const splits = frames?.filter(f => f?.split).length ?? 0
-  const converted = frames?.filter(f => f?.split && f?.splitPickedUp).length ?? 0
-  const cols = [
-    { header: 'X',  headerClass: 'font-bold text-red-400',  value: strikes },
-    { header: '/',  headerClass: 'font-bold text-blue-400', value: spares },
-    { header: '-',  headerClass: 'font-medium text-gray-400', value: opens },
-    { header: '#',  headerClass: 'font-medium text-gray-500', value: initialRun },
-    { header: 'S',  headerClass: 'font-medium text-gray-500', value: splits },
-    { header: 'S/', headerClass: 'font-medium text-gray-500', value: converted },
-  ]
-  return (
-    <div className="grid grid-cols-6 gap-x-1 text-center">
-      {cols.map(c => (
-        <div key={c.header} className={`text-[10px] leading-tight ${c.headerClass}`}>{c.header}</div>
-      ))}
-      {cols.map(c => (
-        <div key={`v-${c.header}`} className="text-sm font-semibold text-gray-800 leading-tight">{c.value}</div>
-      ))}
-    </div>
-  )
-}
-
-// ── Scorecard frame grid (read-only) ─────────────────────────────────────────
-
-function FrameGrid({ frames }) {
-  return (
-    <div className="overflow-x-auto rounded-lg border border-gray-100">
-      <div className="flex min-w-max">
-        {frames.map((frame) => {
-          const isTenth = frame.frame === 10
-          const hasSplit = !!frame.split
-          return (
-            <div
-              key={frame.frame}
-              className={`flex flex-col border-r border-gray-100 last:border-r-0 text-center ${isTenth ? 'w-[4.5rem]' : 'w-10'}`}
-            >
-              <div className="flex items-center justify-center border-b border-gray-100 py-0.5">
-                {hasSplit ? (
-                  <span className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-red-400 text-[9px] font-bold text-red-500">
-                    {frame.frame}
-                  </span>
-                ) : (
-                  <span className="text-[10px] font-medium text-gray-400">{frame.frame}</span>
-                )}
-              </div>
-              <div className="flex h-7 border-b border-gray-100 text-xs">
-                {isTenth ? (
-                  <>
-                    <div className="flex-1 flex items-center justify-center border-r border-gray-50"><BallMark value={frame.balls[0] ?? ''} /></div>
-                    <div className="flex-1 flex items-center justify-center border-r border-gray-50">{frame.balls[1] != null && <BallMark value={frame.balls[1]} />}</div>
-                    <div className="flex-1 flex items-center justify-center">{frame.balls[2] != null && <BallMark value={frame.balls[2]} />}</div>
-                  </>
-                ) : frame.balls[0] === 'X' ? (
-                  <div className="flex-1 flex items-center justify-center"><BallMark value="X" /></div>
-                ) : (
-                  <>
-                    <div className="flex-1 flex items-center justify-center border-r border-gray-50"><BallMark value={frame.balls[0] ?? ''} /></div>
-                    <div className="flex-1 flex items-center justify-center">{frame.balls[1] != null && <BallMark value={frame.balls[1]} />}</div>
-                  </>
-                )}
-              </div>
-              <div className="py-1.5 text-xs font-semibold text-gray-800">{frame.runningScore}</div>
-            </div>
-          )
-        })}
+    <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2.5 space-y-1.5">
+      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-xs text-gray-500">
+        <span><span className="font-semibold text-gray-700">{s.count}</span> game{s.count !== 1 ? 's' : ''}</span>
+        <span className="text-gray-200">·</span>
+        {s.count > 1 ? (
+          <>
+            <span>Avg <span className="font-semibold text-gray-700">{s.avgScore}</span></span>
+            <span className="text-gray-200">·</span>
+            <span>Hi <span className="font-semibold text-gray-700">{s.highScore}</span></span>
+            <span className="text-gray-200">·</span>
+            <span>Lo <span className="font-semibold text-gray-700">{s.lowScore}</span></span>
+            <span className="text-gray-200">·</span>
+            <span>Pins <span className="font-semibold text-gray-700">{s.totalPins}</span></span>
+          </>
+        ) : (
+          <span>Score <span className="font-semibold text-gray-700">{s.totalPins}</span></span>
+        )}
       </div>
-    </div>
-  )
-}
-
-// ── Editable frame grid ──────────────────────────────────────────────────────
-
-function EditableFrameGrid({ frames, onChange }) {
-  const cachedFillBallRef = useRef(null)
-
-  function applyAutoSpare(balls, ballIdx, val) {
-    if (ballIdx === 1 && val !== '/' && val !== 'X' && val !== '-') {
-      const b1 = balls[0]
-      if (b1 !== 'X' && b1 !== '/' && b1 !== '-') {
-        const pins1 = parseInt(b1, 10)
-        const pins2 = parseInt(val, 10)
-        if (!isNaN(pins1) && !isNaN(pins2) && pins1 + pins2 === 10) return '/'
-      }
-    }
-    if (ballIdx === 2 && val !== '/' && val !== 'X' && val !== '-') {
-      const b2 = balls[1]
-      if (b2 !== 'X' && b2 !== '/' && b2 !== '-') {
-        const pins2 = parseInt(b2, 10)
-        const pins3 = parseInt(val, 10)
-        if (!isNaN(pins2) && !isNaN(pins3) && pins2 + pins3 === 10) return '/'
-      }
-    }
-    return val
-  }
-
-  function setBall(fi, ballIdx, val) {
-    const frame = frames[fi]
-    const isTenth = frame.frame === 10
-    let balls = [...frame.balls]
-
-    val = applyAutoSpare(balls, ballIdx, val)
-
-    if (!isTenth && ballIdx === 0) {
-      if (val === 'X') balls = ['X']
-      else if (frame.balls[0] === 'X') balls = [val, '-']
-      else { balls[0] = val }
-    } else {
-      while (balls.length <= ballIdx) balls.push('-')
-      balls[ballIdx] = val
-
-      if (isTenth) {
-        const needsFill = balls[0] === 'X' || balls[1] === '/'
-        if (!needsFill && balls.length > 2) {
-          if (balls[2]) cachedFillBallRef.current = balls[2]
-          balls.splice(2)
-        } else if (needsFill && balls.length <= 2 && cachedFillBallRef.current) {
-          balls[2] = cachedFillBallRef.current
-        }
-      }
-    }
-
-    const b1 = balls[0]
-    const splitStillValid = frame.split && b1 !== 'X' && b1 !== '9'
-    const splitPickedUp = splitStillValid ? balls[1] === '/' : false
-    onChange(frames.map((f, i) => i === fi ? { ...f, balls, split: splitStillValid, splitPickedUp } : f))
-  }
-
-  function toggleSplit(fi) {
-    const frame = frames[fi]
-    const b1 = frame.balls[0]
-    if (!frame.split && (b1 === 'X' || b1 === '9')) return
-    const split = !frame.split
-    onChange(frames.map((f, i) => i === fi ? { ...f, split, splitPickedUp: split ? f.splitPickedUp : false } : f))
-  }
-
-  function toggleSplitPickedUp(fi) {
-    onChange(frames.map((f, i) => i === fi ? { ...f, splitPickedUp: !f.splitPickedUp } : f))
-  }
-
-  return (
-    <div className="overflow-x-auto rounded-lg border border-gray-100">
-      <div className="flex min-w-max">
-        {frames.map((frame, fi) => {
-          const isTenth = frame.frame === 10
-          const isStrike = !isTenth && frame.balls[0] === 'X'
-          const needsFill = isTenth && (frame.balls[0] === 'X' || frame.balls[1] === '/')
-
-          return (
-            <div
-              key={frame.frame}
-              className={`flex flex-col border-r border-gray-100 last:border-r-0 text-center ${isTenth ? 'w-[5.5rem]' : 'w-[3.75rem]'}`}
-            >
-              {/* Frame number + split toggle */}
-              <div className="flex items-center justify-center gap-1 border-b border-gray-100 py-0.5">
-                <span className="text-[10px] font-medium text-gray-400">{frame.frame}</span>
-                <button
-                  title={frame.split ? 'Split (click to remove)' : 'Mark as split'}
-                  onClick={() => toggleSplit(fi)}
-                  className={`inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border text-[8px] font-bold transition-colors
-                    ${frame.split
-                      ? 'border-red-400 bg-red-100 text-red-500'
-                      : 'border-gray-200 text-gray-300 hover:border-red-300'}`}
-                >
-                  S
-                </button>
-              </div>
-
-              {/* Ball inputs — centered in halves (1-9) or thirds (10) */}
-              <div className="flex border-b border-gray-100 py-1">
-                {isTenth ? (
-                  <>
-                    <div className="flex-1 flex items-center justify-center"><EditableBallInput value={frame.balls[0] ?? ''} onChange={v => setBall(fi, 0, v)} /></div>
-                    <div className="flex-1 flex items-center justify-center"><EditableBallInput value={frame.balls[1] ?? ''} onChange={v => setBall(fi, 1, v)} /></div>
-                    <div className="flex-1 flex items-center justify-center"><EditableBallInput value={frame.balls[2] ?? ''} onChange={v => setBall(fi, 2, v)} disabled={!needsFill} /></div>
-                  </>
-                ) : isStrike ? (
-                  <div className="flex-1 flex items-center justify-center"><EditableBallInput value="X" onChange={v => setBall(fi, 0, v)} /></div>
-                ) : (
-                  <>
-                    <div className="flex-1 flex items-center justify-center"><EditableBallInput value={frame.balls[0] ?? ''} onChange={v => setBall(fi, 0, v)} /></div>
-                    <div className="flex-1 flex items-center justify-center"><EditableBallInput value={frame.balls[1] ?? ''} onChange={v => setBall(fi, 1, v)} /></div>
-                  </>
-                )}
-              </div>
-
-              {/* Running score (read-only, computed) */}
-              <div className="py-1.5 text-xs font-semibold text-gray-800">
-                {frame.runningScore ?? ''}
-              </div>
-            </div>
-          )
-        })}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-gray-500">
+        <span><span className="font-bold text-red-400">X</span> <span className="font-semibold text-gray-700">{s.strikes}</span></span>
+        <span><span className="font-bold text-blue-400">/</span> <span className="font-semibold text-gray-700">{s.spares}</span></span>
+        <span><span className="font-medium text-gray-400">-</span> <span className="font-semibold text-gray-700">{s.opens}</span></span>
+        <span><span className="font-medium text-gray-500">S</span> <span className="font-semibold text-gray-700">{s.splits}</span></span>
+        <span><span className="font-medium text-gray-500">S/</span> <span className="font-semibold text-gray-700">{s.converted}</span></span>
       </div>
     </div>
   )
@@ -242,7 +61,7 @@ function EditableFrameGrid({ frames, onChange }) {
 
 // ── Game card ────────────────────────────────────────────────────────────────
 
-function GameCard({ game, expanded, onToggle, onEdit, onDelete }) {
+function GameCard({ game, expanded, onToggle, onEdit, onDelete, vsResult }) {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const date = new Date(game.played_at)
   const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -264,19 +83,35 @@ function GameCard({ game, expanded, onToggle, onEdit, onDelete }) {
     setConfirmDelete(false)
   }
 
+  const vsAccent = vsResult
+    ? vsResult.result === 'W' ? 'border-l-4 border-l-green-400'
+    : vsResult.result === 'L' ? 'border-l-4 border-l-red-400'
+    : 'border-l-4 border-l-gray-300'
+    : ''
+
   return (
-    <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm min-w-[300px]">
+    <div className={`overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm min-w-[300px] ${vsAccent}`}>
       <div className="flex w-full items-center gap-3 px-4 py-3">
         {/* Score bubble */}
-        <button
-          onClick={onToggle}
-          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-slate-900 text-base font-bold text-white"
-        >
+        <button onClick={onToggle} className="flex shrink-0 items-center justify-center rounded-full bg-slate-900 h-12 w-12 text-base font-bold text-white">
           {game.total_score}
         </button>
 
-        {/* Stat table */}
+        {/* Stat table + meta */}
         <button onClick={onToggle} className="flex-1 min-w-0 text-left">
+          {vsResult && (
+            <div className={`mb-1.5 flex items-center gap-1.5`}>
+              <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold tracking-wide
+                ${vsResult.result === 'W' ? 'bg-green-100 text-green-700' :
+                  vsResult.result === 'L' ? 'bg-red-100 text-red-600' :
+                  'bg-gray-100 text-gray-500'}`}>
+                {vsResult.result === 'W' ? 'WIN' : vsResult.result === 'L' ? 'LOSS' : 'TIE'}
+              </span>
+              <span className="text-xs font-medium text-gray-500">vs {vsResult.opponentName}</span>
+              <span className="text-xs text-gray-300">·</span>
+              <span className="text-xs text-gray-400">{vsResult.oppScore}</span>
+            </div>
+          )}
           <StatTable
             strikes={game.strikes}
             spares={game.spares}
@@ -284,7 +119,7 @@ function GameCard({ game, expanded, onToggle, onEdit, onDelete }) {
             initialRun={game.initial_run}
             frames={game.frames}
           />
-          <div className="mt-1 flex items-center gap-2 text-xs text-gray-400">
+          <div className="mt-1 flex items-center gap-2 text-xs text-gray-400 flex-wrap">
             <span>{timeStr}</span>
             {game.player_label && (
               <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-slate-600">
@@ -351,39 +186,84 @@ function GameCard({ game, expanded, onToggle, onEdit, onDelete }) {
 
 // ── Day group ────────────────────────────────────────────────────────────────
 
-function DayGroup({ date, games, expandedGames, onToggleGame, onEditGame, onDeleteGame, defaultCollapsed = false }) {
+function DayGroup({ date, games, expandedGames, onToggleGame, onEditGame, onDeleteGame, defaultCollapsed = false, getVsResult }) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed)
+  const [showSummary, setShowSummary] = useState(false)
   const today = new Date()
   const isToday = today.toDateString() === date.toDateString()
   const label = isToday
     ? 'Today'
     : date.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })
 
+  // Compute per-opponent VS summaries for this day
+  const vsSummaries = (() => {
+    const byOpponent = {}
+    games.forEach(game => {
+      const r = getVsResult?.(game)
+      if (!r) return
+      const key = r.opponentId
+      if (!byOpponent[key]) byOpponent[key] = { name: r.opponentName, w: 0, l: 0, t: 0, myPins: 0, oppPins: 0 }
+      const s = byOpponent[key]
+      if (r.result === 'W') s.w++
+      else if (r.result === 'L') s.l++
+      else s.t++
+      s.myPins += r.myScore
+      s.oppPins += r.oppScore
+    })
+    return Object.values(byOpponent)
+  })()
+
   return (
     <div className="space-y-2">
-      <button
-        onClick={() => setCollapsed(c => !c)}
-        className="flex items-center gap-2 text-sm font-semibold text-gray-600 hover:text-gray-900 transition-colors"
-      >
-        <svg className={`h-3.5 w-3.5 transition-transform ${collapsed ? '-rotate-90' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
-        {label}
-        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">{games.length}</span>
-      </button>
+      <div className="flex items-center justify-between">
+        <button
+          onClick={() => setCollapsed(c => !c)}
+          className="flex items-center gap-2 text-sm font-semibold text-gray-600 hover:text-gray-900 transition-colors"
+        >
+          <svg className={`h-3.5 w-3.5 transition-transform ${collapsed ? '-rotate-90' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+          {label}
+          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">{games.length}</span>
+        </button>
+        <button
+          onClick={() => setShowSummary(s => !s)}
+          className={`flex items-center gap-1 text-xs transition-colors ${showSummary ? 'text-slate-600 font-medium' : 'text-gray-400 hover:text-gray-600'}`}
+        >
+          Summary
+          <svg className={`h-3 w-3 transition-transform ${showSummary ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+      </div>
+
+      {showSummary && <DaySummary games={games} />}
 
       {!collapsed && (
-        <div className="space-y-2 pl-4">
-          {games.map(game => (
-            <GameCard
-              key={game.id}
-              game={game}
-              expanded={expandedGames.has(game.id)}
-              onToggle={() => onToggleGame(game.id)}
-              onEdit={onEditGame}
-              onDelete={onDeleteGame}
-            />
+        <div className="pl-4 space-y-2">
+          {vsSummaries.map(s => (
+            <p key={s.name} className="text-xs text-gray-500">
+              <span className="font-medium text-gray-600">vs {s.name}</span>
+              {' — '}
+              <span className="font-semibold text-gray-700">
+                {s.w}W-{s.l}L{s.t > 0 ? `-${s.t}T` : ''}
+              </span>
+              <span className="text-gray-400"> · {s.myPins}-{s.oppPins} pins</span>
+            </p>
           ))}
+          <div className="space-y-2">
+            {games.map(game => (
+              <GameCard
+                key={game.id}
+                game={game}
+                expanded={expandedGames.has(game.id)}
+                onToggle={() => onToggleGame(game.id)}
+                onEdit={onEditGame}
+                onDelete={onDeleteGame}
+                vsResult={getVsResult?.(game)}
+              />
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -392,7 +272,7 @@ function DayGroup({ date, games, expandedGames, onToggleGame, onEditGame, onDele
 
 // ── Month group ──────────────────────────────────────────────────────────────
 
-function MonthGroup({ label, dayGroups, expandedGames, onToggleGame, onEditGame, onDeleteGame }) {
+function MonthGroup({ label, dayGroups, expandedGames, onToggleGame, onEditGame, onDeleteGame, getVsResult }) {
   const [collapsed, setCollapsed] = useState(true)
   const totalGames = dayGroups.reduce((sum, d) => sum + d.games.length, 0)
 
@@ -420,6 +300,7 @@ function MonthGroup({ label, dayGroups, expandedGames, onToggleGame, onEditGame,
               onToggleGame={onToggleGame}
               onEditGame={onEditGame}
               onDeleteGame={onDeleteGame}
+              getVsResult={getVsResult}
               defaultCollapsed={true}
             />
           ))}
@@ -850,23 +731,77 @@ export default function MyGames({ session }) {
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [showUpload, setShowUpload] = useState(false)
+  const [showVsUpload, setShowVsUpload] = useState(false)
   const [editingGame, setEditingGame] = useState(null)
   const [expandedGames, setExpandedGames] = useState(new Set())
   const [showLegend, setShowLegend] = useState(false)
+  const [vsMatchMap, setVsMatchMap] = useState({})
+  const [vsOpponentGameMap, setVsOpponentGameMap] = useState({})
 
   useEffect(() => {
-    loadGames()
+    loadGamesAndVsData()
     loadProfile()
   }, [])
 
-  async function loadGames() {
-    const { data } = await supabase
+  async function loadGamesAndVsData() {
+    const { data: gamesData } = await supabase
       .from('games')
       .select('*')
       .eq('user_id', session.user.id)
       .order('played_at', { ascending: false })
-    setGames(data || [])
+
+    const allGames = gamesData || []
+    setGames(allGames)
     setLoading(false)
+
+    const vsMatchIds = [...new Set(
+      allGames.filter(g => g.is_vs && g.vs_match_id).map(g => g.vs_match_id)
+    )]
+    if (vsMatchIds.length === 0) return
+
+    const { data: vsData } = await supabase
+      .from('vs_matches')
+      .select('id, submitter_id, opponent_id, submitter_game_id, opponent_game_id')
+      .in('id', vsMatchIds)
+
+    const matchMap = {}
+    vsData?.forEach(m => { matchMap[m.id] = m })
+    setVsMatchMap(matchMap)
+
+    // Fetch opponent profiles and game scores in parallel
+    const opponentIds = [...new Set(
+      Object.values(matchMap).map(m =>
+        m.submitter_id === session.user.id ? m.opponent_id : m.submitter_id
+      )
+    )]
+    const opponentGameIds = allGames
+      .filter(g => g.is_vs && g.vs_match_id && matchMap[g.vs_match_id])
+      .map(g => {
+        const m = matchMap[g.vs_match_id]
+        return g.user_id === m.submitter_id ? m.opponent_game_id : m.submitter_game_id
+      })
+      .filter(Boolean)
+
+    const [profilesRes, oppGamesRes] = await Promise.all([
+      opponentIds.length > 0
+        ? supabase.from('profiles').select('id, display_name, email').in('id', opponentIds)
+        : Promise.resolve({ data: [] }),
+      opponentGameIds.length > 0
+        ? supabase.from('games').select('id, user_id, total_score').in('id', opponentGameIds)
+        : Promise.resolve({ data: [] }),
+    ])
+
+    const profileMap = Object.fromEntries((profilesRes.data || []).map(p => [p.id, p]))
+    // Attach profiles to match map entries for use in getVsResult
+    Object.values(matchMap).forEach(m => {
+      m.submitterProfile = profileMap[m.submitter_id] ?? { id: m.submitter_id }
+      m.opponentProfile = profileMap[m.opponent_id] ?? { id: m.opponent_id }
+    })
+    setVsMatchMap({ ...matchMap })
+
+    const oppMap = {}
+    oppGamesRes.data?.forEach(g => { oppMap[g.id] = g })
+    setVsOpponentGameMap(oppMap)
   }
 
   async function loadProfile() {
@@ -876,6 +811,21 @@ export default function MyGames({ session }) {
       .eq('id', session.user.id)
       .single()
     setProfile(data)
+  }
+
+  function getVsResult(game) {
+    if (!game.is_vs || !game.vs_match_id) return null
+    const match = vsMatchMap[game.vs_match_id]
+    if (!match) return null
+    const isSubmitter = game.user_id === match.submitter_id
+    const opponentGameId = isSubmitter ? match.opponent_game_id : match.submitter_game_id
+    const opponentProfile = isSubmitter ? match.opponentProfile : match.submitterProfile
+    const oppGame = vsOpponentGameMap[opponentGameId]
+    if (!oppGame) return null
+    const oppName = opponentProfile?.display_name || opponentProfile?.email || 'Opponent'
+    const result = game.total_score > oppGame.total_score ? 'W' :
+                   game.total_score < oppGame.total_score ? 'L' : 'T'
+    return { result, opponentName: oppName, opponentId: opponentProfile?.id, myScore: game.total_score, oppScore: oppGame.total_score }
   }
 
   function toggleGame(id) {
@@ -888,6 +838,13 @@ export default function MyGames({ session }) {
 
   function handleGameSaved(newGame) {
     setGames(prev => [newGame, ...prev])
+    // Reload VS data to pick up the new match's metadata
+    loadGamesAndVsData()
+  }
+
+  function handleVsSaved({ submitterGame }) {
+    setGames(prev => [submitterGame, ...prev])
+    loadGamesAndVsData()
   }
 
   function handleGameUpdated(updatedGame) {
@@ -895,6 +852,7 @@ export default function MyGames({ session }) {
   }
 
   async function handleDeleteGame(id) {
+    // The trg_vs_game_delete trigger handles VS match cleanup automatically
     const { error } = await supabase
       .from('games')
       .delete()
@@ -904,6 +862,8 @@ export default function MyGames({ session }) {
     if (!error) {
       setGames(prev => prev.filter(g => g.id !== id))
       setExpandedGames(prev => { const next = new Set(prev); next.delete(id); return next })
+      // Reload VS data since a match may have been dissolved
+      loadGamesAndVsData()
     }
   }
 
@@ -933,7 +893,7 @@ export default function MyGames({ session }) {
 
   const months = Object.values(gamesByMonth).sort((a, b) => b.date - a.date)
 
-  const sharedProps = { expandedGames, onToggleGame: toggleGame, onEditGame: setEditingGame, onDeleteGame: handleDeleteGame }
+  const sharedProps = { expandedGames, onToggleGame: toggleGame, onEditGame: setEditingGame, onDeleteGame: handleDeleteGame, getVsResult }
 
   return (
     <div className="space-y-6">
@@ -957,15 +917,23 @@ export default function MyGames({ session }) {
           </p>
           {showLegend && <LegendPopover onClose={() => setShowLegend(false)} />}
         </div>
-        <button
-          onClick={() => setShowUpload(true)}
-          className="flex items-center gap-1.5 rounded-xl bg-slate-800 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 transition-colors"
-        >
-          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-          Upload Game
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowVsUpload(true)}
+            className="flex items-center gap-1.5 rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+          >
+            VS
+          </button>
+          <button
+            onClick={() => setShowUpload(true)}
+            className="flex items-center gap-1.5 rounded-xl bg-slate-800 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 transition-colors"
+          >
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            Upload Game
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -1008,6 +976,14 @@ export default function MyGames({ session }) {
           profile={profile}
           onClose={() => setShowUpload(false)}
           onSaved={handleGameSaved}
+        />
+      )}
+
+      {showVsUpload && (
+        <VSSubmitModal
+          session={session}
+          onClose={() => setShowVsUpload(false)}
+          onSaved={handleVsSaved}
         />
       )}
 
