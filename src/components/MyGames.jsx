@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import { parseScorecard } from '../lib/gemini'
 import { computeStats, computeScores } from '../lib/parseGame'
 import { BallMark, EditableBallInput, StatTable, FrameGrid, EditableFrameGrid } from './Scorecard'
-import VSSubmitModal from './VSSubmitModal'
+
 
 // ── Day summary helper ───────────────────────────────────────────────────────
 
@@ -312,7 +312,7 @@ function MonthGroup({ label, dayGroups, expandedGames, onToggleGame, onEditGame,
 
 // ── Upload modal (new game) ──────────────────────────────────────────────────
 
-function UploadModal({ session, profile, onClose, onSaved }) {
+export function UploadModal({ session, profile, onClose, onSaved }) {
   const [phase, setPhase] = useState('input')
   const [imageFile, setImageFile] = useState(null)
   const [previewUrl, setPreviewUrl] = useState(null)
@@ -726,12 +726,9 @@ function LegendPopover({ onClose }) {
 
 // ── Main page ────────────────────────────────────────────────────────────────
 
-export default function MyGames({ session }) {
+export default function MyGames({ session, refreshKey = 0, onOpenUpload }) {
   const [games, setGames] = useState([])
-  const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [showUpload, setShowUpload] = useState(false)
-  const [showVsUpload, setShowVsUpload] = useState(false)
   const [editingGame, setEditingGame] = useState(null)
   const [expandedGames, setExpandedGames] = useState(new Set())
   const [showLegend, setShowLegend] = useState(false)
@@ -740,8 +737,7 @@ export default function MyGames({ session }) {
 
   useEffect(() => {
     loadGamesAndVsData()
-    loadProfile()
-  }, [])
+  }, [refreshKey])
 
   async function loadGamesAndVsData() {
     const { data: gamesData } = await supabase
@@ -804,15 +800,6 @@ export default function MyGames({ session }) {
     setVsOpponentGameMap(oppMap)
   }
 
-  async function loadProfile() {
-    const { data } = await supabase
-      .from('profiles')
-      .select('player_label')
-      .eq('id', session.user.id)
-      .single()
-    setProfile(data)
-  }
-
   function getVsResult(game) {
     if (!game.is_vs || !game.vs_match_id) return null
     const match = vsMatchMap[game.vs_match_id]
@@ -834,17 +821,6 @@ export default function MyGames({ session }) {
       next.has(id) ? next.delete(id) : next.add(id)
       return next
     })
-  }
-
-  function handleGameSaved(newGame) {
-    setGames(prev => [newGame, ...prev])
-    // Reload VS data to pick up the new match's metadata
-    loadGamesAndVsData()
-  }
-
-  function handleVsSaved({ submitterGame }) {
-    setGames(prev => [submitterGame, ...prev])
-    loadGamesAndVsData()
   }
 
   function handleGameUpdated(updatedGame) {
@@ -897,7 +873,7 @@ export default function MyGames({ session }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div>
         <div className="relative">
           <div className="flex items-center gap-2">
             <h2 className="text-xl font-bold text-gray-900">My Games</h2>
@@ -917,23 +893,6 @@ export default function MyGames({ session }) {
           </p>
           {showLegend && <LegendPopover onClose={() => setShowLegend(false)} />}
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowVsUpload(true)}
-            className="flex items-center gap-1.5 rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
-          >
-            VS
-          </button>
-          <button
-            onClick={() => setShowUpload(true)}
-            className="flex items-center gap-1.5 rounded-xl bg-slate-800 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 transition-colors"
-          >
-            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            Upload Game
-          </button>
-        </div>
       </div>
 
       {loading ? (
@@ -942,6 +901,14 @@ export default function MyGames({ session }) {
         <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-200 py-16">
           <p className="text-sm font-medium text-gray-400">No games recorded yet</p>
           <p className="mt-1 text-xs text-gray-300">Upload a photo of your scorecard to get started</p>
+          {onOpenUpload && (
+            <button
+              onClick={onOpenUpload}
+              className="mt-4 rounded-xl bg-slate-800 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 transition-colors"
+            >
+              Upload your first game
+            </button>
+          )}
         </div>
       ) : (
         <div className="space-y-4">
@@ -968,23 +935,6 @@ export default function MyGames({ session }) {
             )
           })}
         </div>
-      )}
-
-      {showUpload && (
-        <UploadModal
-          session={session}
-          profile={profile}
-          onClose={() => setShowUpload(false)}
-          onSaved={handleGameSaved}
-        />
-      )}
-
-      {showVsUpload && (
-        <VSSubmitModal
-          session={session}
-          onClose={() => setShowVsUpload(false)}
-          onSaved={handleVsSaved}
-        />
       )}
 
       {editingGame && (

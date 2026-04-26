@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import MyGames from './MyGames'
+import MyGames, { UploadModal } from './MyGames'
 import FindFriends from './FindFriends'
 import VSMatches from './VSMatches'
+import VSSubmitModal from './VSSubmitModal'
 import UserMenu from './UserMenu'
 
 const NAV_ITEMS = [
@@ -89,10 +90,32 @@ export default function Layout({ session }) {
   const [activePage, setActivePage] = useState('my-games')
   const [mobileOpen, setMobileOpen] = useState(false)
   const [vsUnreadCount, setVsUnreadCount] = useState(0)
+  const [uploadStep, setUploadStep] = useState(null) // null | 'choose' | 'single' | 'vs'
+  const [refreshKey, setRefreshKey] = useState(0)
+  const [profile, setProfile] = useState(null)
 
   useEffect(() => {
     loadVsUnreadCount()
+    loadProfile()
   }, [])
+
+  async function loadProfile() {
+    const { data } = await supabase
+      .from('profiles')
+      .select('player_label')
+      .eq('id', session.user.id)
+      .single()
+    setProfile(data)
+  }
+
+  function openUpload() { setUploadStep('choose') }
+  function closeUpload() { setUploadStep(null) }
+
+  function handleGameSaved() {
+    setUploadStep(null)
+    setActivePage('my-games')
+    setRefreshKey(k => k + 1)
+  }
 
   async function loadVsUnreadCount() {
     const { count } = await supabase
@@ -123,6 +146,18 @@ export default function Layout({ session }) {
       {/* Desktop sidebar — always visible at md+ */}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col bg-slate-900 md:flex">
         <SidebarHeader />
+        <div className="px-3 pt-3">
+          <button
+            onClick={openUpload}
+            className="flex w-full items-center gap-2 rounded-lg bg-white/10 px-3 py-2.5 text-sm font-semibold text-white hover:bg-white/20 transition-colors"
+          >
+            <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+              <circle cx="12" cy="13" r="4"/>
+            </svg>
+            Upload Game
+          </button>
+        </div>
         <div className="flex-1 overflow-y-auto">
           <SidebarNav activePage={activePage} onNavClick={handleNavClick} vsUnreadCount={vsUnreadCount} />
         </div>
@@ -150,6 +185,18 @@ export default function Layout({ session }) {
                   <line x1="18" y1="6" x2="6" y2="18"/>
                   <line x1="6" y1="6" x2="18" y2="18"/>
                 </svg>
+              </button>
+            </div>
+            <div className="px-3 pt-3">
+              <button
+                onClick={() => { setMobileOpen(false); openUpload() }}
+                className="flex w-full items-center gap-2 rounded-lg bg-white/10 px-3 py-2.5 text-sm font-semibold text-white hover:bg-white/20 transition-colors"
+              >
+                <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                  <circle cx="12" cy="13" r="4"/>
+                </svg>
+                Upload Game
               </button>
             </div>
             <div className="flex-1 overflow-y-auto">
@@ -190,14 +237,91 @@ export default function Layout({ session }) {
         <UserMenu session={session} />
       </header>
 
+      {/* FAB — mobile only */}
+      <button
+        onClick={openUpload}
+        className="fixed bottom-6 right-6 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-slate-800 text-white shadow-lg hover:bg-slate-700 transition-colors md:hidden"
+        aria-label="Upload game"
+      >
+        <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+          <circle cx="12" cy="13" r="4"/>
+        </svg>
+      </button>
+
       {/* Page content */}
       <main className="pt-14 md:ml-64">
         <div className="mx-auto max-w-2xl px-4 py-6 md:px-6">
-          {activePage === 'my-games' && <MyGames session={session} />}
+          {activePage === 'my-games' && (
+            <MyGames session={session} refreshKey={refreshKey} onOpenUpload={openUpload} />
+          )}
           {activePage === 'find-friends' && <FindFriends session={session} />}
           {activePage === 'vs-matches' && <VSMatches session={session} />}
         </div>
       </main>
+
+      {/* Type chooser */}
+      {uploadStep === 'choose' && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center">
+          <div className="w-full max-w-md rounded-t-2xl bg-white p-5 shadow-2xl sm:rounded-2xl">
+            <div className="mb-5 flex items-center justify-between">
+              <h3 className="text-base font-bold text-gray-900">Upload New Game</h3>
+              <button onClick={closeUpload} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 transition-colors">
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => setUploadStep('single')}
+                className="flex flex-col items-center gap-3 rounded-2xl border-2 border-gray-100 bg-gray-50 px-4 py-6 hover:border-slate-300 hover:bg-slate-50 transition-colors"
+              >
+                <svg className="h-8 w-8 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                  <circle cx="12" cy="13" r="4"/>
+                </svg>
+                <div className="text-center">
+                  <p className="text-sm font-semibold text-gray-900">Single Game</p>
+                  <p className="mt-0.5 text-xs text-gray-400">Just you</p>
+                </div>
+              </button>
+              <button
+                onClick={() => setUploadStep('vs')}
+                className="flex flex-col items-center gap-3 rounded-2xl border-2 border-gray-100 bg-gray-50 px-4 py-6 hover:border-slate-300 hover:bg-slate-50 transition-colors"
+              >
+                <svg className="h-8 w-8 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                  <circle cx="9" cy="7" r="4"/>
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                </svg>
+                <div className="text-center">
+                  <p className="text-sm font-semibold text-gray-900">VS Match</p>
+                  <p className="mt-0.5 text-xs text-gray-400">Head-to-head</p>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {uploadStep === 'single' && (
+        <UploadModal
+          session={session}
+          profile={profile}
+          onClose={closeUpload}
+          onSaved={handleGameSaved}
+        />
+      )}
+
+      {uploadStep === 'vs' && (
+        <VSSubmitModal
+          session={session}
+          onClose={closeUpload}
+          onSaved={handleGameSaved}
+        />
+      )}
     </div>
   )
 }

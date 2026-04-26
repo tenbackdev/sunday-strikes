@@ -12,6 +12,7 @@ export function BallMark({ value }) {
 // ── Editable ball input ──────────────────────────────────────────────────────
 
 export function EditableBallInput({ value, onChange, disabled }) {
+  const inputRef = useRef(null)
   const color =
     value === 'X' ? 'text-red-500 border-red-200 bg-red-50' :
     value === '/' ? 'text-blue-500 border-blue-200 bg-blue-50' :
@@ -20,15 +21,26 @@ export function EditableBallInput({ value, onChange, disabled }) {
 
   return (
     <input
+      ref={inputRef}
       type="text"
       value={value ?? ''}
       disabled={disabled}
+      data-ball-input
+      onFocus={e => e.target.select()}
       onChange={e => {
         let raw = e.target.value.toUpperCase()
         if (raw === '0') raw = '-'
         else if (raw === '10') raw = 'X'
         else raw = raw.slice(-1)
-        if (raw === '' || /^[X\/\-1-9]$/.test(raw)) onChange(raw)
+        if (raw === '' || /^[X\/\-1-9]$/.test(raw)) {
+          onChange(raw)
+          if (/^[X\/\-1-9]$/.test(raw)) {
+            const grid = inputRef.current?.closest('[data-frame-grid]')
+            const all = Array.from(grid?.querySelectorAll('[data-ball-input]:not([disabled])') ?? [])
+            const idx = all.indexOf(inputRef.current)
+            if (idx >= 0 && idx < all.length - 1) all[idx + 1].focus()
+          }
+        }
       }}
       className={`w-7 h-7 rounded border text-center text-xs font-bold outline-none transition-colors
         ${color}
@@ -176,7 +188,7 @@ export function EditableFrameGrid({ frames, onChange }) {
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-gray-100">
+    <div data-frame-grid className="overflow-x-auto rounded-lg border border-gray-100">
       <div className="flex min-w-max">
         {frames.map((frame, fi) => {
           const isTenth = frame.frame === 10
