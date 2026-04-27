@@ -601,11 +601,13 @@ function EditGameModal({ game, session, onClose, onSaved }) {
       ...(shouldSetAiFrames ? { ai_frames: originalFrames } : {}),
     }
 
-    const { error: saveErr } = await supabase
+    const { data: savedGame, error: saveErr } = await supabase
       .from('games')
       .update(updates)
       .eq('id', game.id)
       .eq('user_id', session.user.id)
+      .select()
+      .single()
 
     if (saveErr) {
       setError('Failed to save. ' + saveErr.message)
@@ -613,7 +615,13 @@ function EditGameModal({ game, session, onClose, onSaved }) {
       return
     }
 
-    onSaved({ ...game, ...updates })
+    if (!savedGame) {
+      setError('Save failed — game not found or permission denied.')
+      setSaving(false)
+      return
+    }
+
+    onSaved(savedGame)
     onClose()
   }
 
