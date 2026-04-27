@@ -136,3 +136,10 @@ export function computeStats(frames) {
 
   return { strikes, spares, opens, initialRun }
 }
+
+export function isConvertedSplit(frame) {
+  if (!frame?.split) return false
+  const [b1, b2, b3] = frame.balls ?? []
+  if (frame.frame === 10) return b1 === 'X' ? b3 === '/' : b2 === '/'
+  return b2 === '/'
+}

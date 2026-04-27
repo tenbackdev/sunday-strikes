@@ -1,4 +1,5 @@
 import { useRef } from 'react'
+import { isConvertedSplit } from '../lib/parseGame'
 
 // ── Ball mark (display only) ─────────────────────────────────────────────────
 
@@ -53,7 +54,7 @@ export function EditableBallInput({ value, onChange, disabled }) {
 
 export function StatTable({ strikes, spares, opens, initialRun, frames }) {
   const splits = frames?.filter(f => f?.split).length ?? 0
-  const converted = frames?.filter(f => f?.split && f?.splitPickedUp).length ?? 0
+  const converted = frames?.filter(f => isConvertedSplit(f)).length ?? 0
   const cols = [
     { header: 'X',  headerClass: 'font-bold text-red-400',  value: strikes },
     { header: '/',  headerClass: 'font-bold text-blue-400', value: spares },
@@ -83,25 +84,28 @@ export function FrameGrid({ frames }) {
         {frames.map((frame) => {
           const isTenth = frame.frame === 10
           const hasSplit = !!frame.split
+          // Frame 10: split circle goes on ball 2 when ball 1 is a strike, otherwise ball 1
+          const splitBallIdx = isTenth && frame.balls[0] === 'X' ? 1 : 0
+          // Wraps a ball mark with a red circle when it is the split ball
+          const sb = (val, idx) => hasSplit && idx === splitBallIdx ? (
+            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-red-400">
+              <BallMark value={val} />
+            </span>
+          ) : <BallMark value={val} />
+
           return (
             <div
               key={frame.frame}
               className={`flex flex-col border-r border-gray-100 last:border-r-0 text-center ${isTenth ? 'w-[4.5rem]' : 'w-10'}`}
             >
               <div className="flex items-center justify-center border-b border-gray-100 py-0.5">
-                {hasSplit ? (
-                  <span className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-red-400 text-[9px] font-bold text-red-500">
-                    {frame.frame}
-                  </span>
-                ) : (
-                  <span className="text-[10px] font-medium text-gray-400">{frame.frame}</span>
-                )}
+                <span className="text-[10px] font-medium text-gray-400">{frame.frame}</span>
               </div>
               <div className="flex h-7 border-b border-gray-100 text-xs">
                 {isTenth ? (
                   <>
-                    <div className="flex-1 flex items-center justify-center border-r border-gray-50"><BallMark value={frame.balls[0] ?? ''} /></div>
-                    <div className="flex-1 flex items-center justify-center border-r border-gray-50">{frame.balls[1] != null && <BallMark value={frame.balls[1]} />}</div>
+                    <div className="flex-1 flex items-center justify-center border-r border-gray-50">{sb(frame.balls[0] ?? '', 0)}</div>
+                    <div className="flex-1 flex items-center justify-center border-r border-gray-50">{frame.balls[1] != null && sb(frame.balls[1], 1)}</div>
                     <div className="flex-1 flex items-center justify-center">
                       {(frame.balls[0] === 'X' || frame.balls[1] === '/') && frame.balls[2] != null && <BallMark value={frame.balls[2]} />}
                     </div>
@@ -110,7 +114,7 @@ export function FrameGrid({ frames }) {
                   <div className="flex-1 flex items-center justify-center"><BallMark value="X" /></div>
                 ) : (
                   <>
-                    <div className="flex-1 flex items-center justify-center border-r border-gray-50"><BallMark value={frame.balls[0] ?? ''} /></div>
+                    <div className="flex-1 flex items-center justify-center border-r border-gray-50">{sb(frame.balls[0] ?? '', 0)}</div>
                     <div className="flex-1 flex items-center justify-center">{frame.balls[1] != null && <BallMark value={frame.balls[1]} />}</div>
                   </>
                 )}

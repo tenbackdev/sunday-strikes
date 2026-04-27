@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { parseScorecard } from '../lib/gemini'
-import { computeStats, computeScores } from '../lib/parseGame'
+import { computeStats, computeScores, isConvertedSplit } from '../lib/parseGame'
 import { BallMark, EditableBallInput, StatTable, FrameGrid, EditableFrameGrid } from './Scorecard'
 
 
@@ -18,7 +18,7 @@ function computeDaySummary(games) {
     spares  += st.spares
     opens   += st.opens
     splits    += g.frames?.filter(f => f?.split).length ?? 0
-    converted += g.frames?.filter(f => f?.split && f?.splitPickedUp).length ?? 0
+    converted += g.frames?.filter(f => isConvertedSplit(f)).length ?? 0
   }
   return {
     count,
