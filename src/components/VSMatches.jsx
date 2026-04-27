@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { FrameGrid } from './Scorecard'
+import { computeStats } from '../lib/parseGame'
 
 const TIME_FILTERS = [
   { key: 'all',  label: 'All Time' },
@@ -13,19 +14,22 @@ function computeDaySummary(games) {
   const count = games.length
   const scores = games.map(g => g.total_score)
   const totalPins = scores.reduce((s, v) => s + v, 0)
-  const splits = games.reduce((s, g) => s + (g.frames?.filter(f => f?.split).length ?? 0), 0)
-  const converted = games.reduce((s, g) => s + (g.frames?.filter(f => f?.split && f?.splitPickedUp).length ?? 0), 0)
+  let strikes = 0, spares = 0, opens = 0, splits = 0, converted = 0
+  for (const g of games) {
+    const st = computeStats(g.frames ?? [])
+    strikes += st.strikes
+    spares  += st.spares
+    opens   += st.opens
+    splits    += g.frames?.filter(f => f?.split).length ?? 0
+    converted += g.frames?.filter(f => f?.split && f?.splitPickedUp).length ?? 0
+  }
   return {
     count,
     totalPins,
     avgScore: count > 0 ? Math.round(totalPins / count) : 0,
     highScore: count > 0 ? Math.max(...scores) : 0,
     lowScore: count > 0 ? Math.min(...scores) : 0,
-    strikes: games.reduce((s, g) => s + (g.strikes ?? 0), 0),
-    spares: games.reduce((s, g) => s + (g.spares ?? 0), 0),
-    opens: games.reduce((s, g) => s + (g.opens ?? 0), 0),
-    splits,
-    converted,
+    strikes, spares, opens, splits, converted,
   }
 }
 
@@ -223,7 +227,7 @@ export default function VSMatches({ session }) {
 
     const [profilesRes, gamesRes] = await Promise.all([
       supabase.from('profiles').select('id, display_name, email').in('id', allUserIds),
-      supabase.from('games').select('id, user_id, total_score, frames, strikes, spares, opens').in('id', allGameIds),
+      supabase.from('games').select('id, user_id, total_score, frames').in('id', allGameIds),
     ])
 
     const profileMap = Object.fromEntries((profilesRes.data || []).map(p => [p.id, p]))

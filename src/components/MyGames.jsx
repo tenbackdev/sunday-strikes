@@ -11,19 +11,22 @@ function computeDaySummary(games) {
   const count = games.length
   const scores = games.map(g => g.total_score)
   const totalPins = scores.reduce((s, v) => s + v, 0)
-  const splits = games.reduce((s, g) => s + (g.frames?.filter(f => f?.split).length ?? 0), 0)
-  const converted = games.reduce((s, g) => s + (g.frames?.filter(f => f?.split && f?.splitPickedUp).length ?? 0), 0)
+  let strikes = 0, spares = 0, opens = 0, splits = 0, converted = 0
+  for (const g of games) {
+    const st = computeStats(g.frames ?? [])
+    strikes += st.strikes
+    spares  += st.spares
+    opens   += st.opens
+    splits    += g.frames?.filter(f => f?.split).length ?? 0
+    converted += g.frames?.filter(f => f?.split && f?.splitPickedUp).length ?? 0
+  }
   return {
     count,
     totalPins,
     avgScore: count > 0 ? Math.round(totalPins / count) : 0,
     highScore: count > 0 ? Math.max(...scores) : 0,
     lowScore: count > 0 ? Math.min(...scores) : 0,
-    strikes: games.reduce((s, g) => s + (g.strikes ?? 0), 0),
-    spares: games.reduce((s, g) => s + (g.spares ?? 0), 0),
-    opens: games.reduce((s, g) => s + (g.opens ?? 0), 0),
-    splits,
-    converted,
+    strikes, spares, opens, splits, converted,
   }
 }
 
@@ -65,6 +68,7 @@ function GameCard({ game, expanded, onToggle, onEdit, onDelete, vsResult }) {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const date = new Date(game.played_at)
   const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  const { strikes, spares, opens, initialRun } = computeStats(game.frames ?? [])
 
   function handleDelete(e) {
     e.stopPropagation()
@@ -113,10 +117,10 @@ function GameCard({ game, expanded, onToggle, onEdit, onDelete, vsResult }) {
             </div>
           )}
           <StatTable
-            strikes={game.strikes}
-            spares={game.spares}
-            opens={game.opens}
-            initialRun={game.initial_run}
+            strikes={strikes}
+            spares={spares}
+            opens={opens}
+            initialRun={initialRun}
             frames={game.frames}
           />
           <div className="mt-1 flex items-center gap-2 text-xs text-gray-400 flex-wrap">
@@ -398,10 +402,6 @@ export function UploadModal({ session, profile, onClose, onSaved }) {
         played_at: new Date(playedAt).toISOString(),
         total_score: totalScore,
         player_label: playerLabel.trim(),
-        strikes: parsedData.strikes,
-        spares: parsedData.spares,
-        opens: parsedData.opens,
-        initial_run: parsedData.initialRun,
         frames: parsedData.frames,
         ...(framesEdited ? { ai_frames: aiFrames } : {}),
       })
@@ -593,10 +593,6 @@ function EditGameModal({ game, session, onClose, onSaved }) {
       played_at: new Date(playedAt).toISOString(),
       total_score: totalScore,
       player_label: playerLabel.trim(),
-      strikes: stats.strikes,
-      spares: stats.spares,
-      opens: stats.opens,
-      initial_run: stats.initialRun,
       frames,
       ...(shouldSetAiFrames ? { ai_frames: originalFrames } : {}),
     }
@@ -605,7 +601,6 @@ function EditGameModal({ game, session, onClose, onSaved }) {
       .from('games')
       .update(updates)
       .eq('id', game.id)
-      .eq('user_id', session.user.id)
       .select()
       .single()
 

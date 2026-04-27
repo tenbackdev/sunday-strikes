@@ -78,8 +78,8 @@ export function StatTable({ strikes, spares, opens, initialRun, frames }) {
 
 export function FrameGrid({ frames }) {
   return (
-    <div className="overflow-x-auto rounded-lg border border-gray-100">
-      <div className="flex min-w-max">
+    <div className="overflow-x-auto">
+      <div className="flex w-max rounded-lg border border-gray-100 mx-auto">
         {frames.map((frame) => {
           const isTenth = frame.frame === 10
           const hasSplit = !!frame.split
@@ -102,7 +102,9 @@ export function FrameGrid({ frames }) {
                   <>
                     <div className="flex-1 flex items-center justify-center border-r border-gray-50"><BallMark value={frame.balls[0] ?? ''} /></div>
                     <div className="flex-1 flex items-center justify-center border-r border-gray-50">{frame.balls[1] != null && <BallMark value={frame.balls[1]} />}</div>
-                    <div className="flex-1 flex items-center justify-center">{frame.balls[2] != null && <BallMark value={frame.balls[2]} />}</div>
+                    <div className="flex-1 flex items-center justify-center">
+                      {(frame.balls[0] === 'X' || frame.balls[1] === '/') && frame.balls[2] != null && <BallMark value={frame.balls[2]} />}
+                    </div>
                   </>
                 ) : frame.balls[0] === 'X' ? (
                   <div className="flex-1 flex items-center justify-center"><BallMark value="X" /></div>

@@ -81,18 +81,56 @@ export function computeStats(frames) {
   let perfectStillPossible = true
 
   for (const frame of frames) {
-    const [b1, b2] = frame.balls
-    const isStrike = b1 === 'X'
-    const isSpare = !isStrike && b2 === '/'
-    const isOpen = !isStrike && !isSpare
+    if (frame.frame === 10) {
+      const [b1, b2, b3] = frame.balls
 
-    if (isStrike) strikes++
-    else if (isSpare) spares++
-    else opens++
+      if (b1 === 'X') {
+        // Scenarios 4, 5, 6, 7 — ball 1 is a strike
+        strikes++
+        if (perfectStillPossible) initialRun++
 
-    if (perfectStillPossible) {
-      if (isStrike) initialRun++
-      else perfectStillPossible = false
+        if (b2 === 'X') {
+          // Scenarios 6, 7 — ball 2 is also a strike
+          strikes++
+          if (perfectStillPossible) initialRun++
+          if (b3 === 'X') {
+            // Scenario 7 — all three strikes
+            strikes++
+            if (perfectStillPossible) initialRun++
+          }
+          // else: fill ball is a number — not counted (Scenario 6)
+        } else {
+          // Ball 2 is a number; balls 2+3 form either a spare or open
+          perfectStillPossible = false
+          if (b3 === '/') spares++ // Scenario 5
+          else            opens++  // Scenario 4
+        }
+      } else {
+        // Ball 1 is a number
+        perfectStillPossible = false
+        if (b2 === '/') {
+          // Scenarios 2, 3 — balls 1+2 make a spare
+          spares++
+          if (b3 === 'X') strikes++ // Scenario 3 — fill strike
+          // else: fill ball is a number — not counted (Scenario 2)
+        } else {
+          opens++ // Scenario 1 — open frame
+        }
+      }
+    } else {
+      // Frames 1–9
+      const [b1, b2] = frame.balls
+      const isStrike = b1 === 'X'
+      const isSpare  = !isStrike && b2 === '/'
+
+      if (isStrike)      strikes++
+      else if (isSpare)  spares++
+      else               opens++
+
+      if (perfectStillPossible) {
+        if (isStrike) initialRun++
+        else          perfectStillPossible = false
+      }
     }
   }
 
