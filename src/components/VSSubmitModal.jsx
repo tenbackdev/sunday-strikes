@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { parseScorecard, parseBothScorecards } from '../lib/gemini'
 import { computeStats, computeScores } from '../lib/parseGame'
 import { StatTable, FrameGrid, EditableFrameGrid } from './Scorecard'
+import { loadUploadPrefs, saveUploadPrefs } from '../lib/uploadPrefs'
 
 function defaultPlayedAt() {
   const now = new Date()
@@ -325,24 +326,24 @@ function CombinedScorecardStep({
 }
 
 export default function VSSubmitModal({ session, onClose, onSaved }) {
-  const [step, setStep] = useState(1)
-  const [photoMode, setPhotoMode] = useState('separate') // 'separate' | 'combined'
+  const [step, setStep] = useState(() => loadUploadPrefs()?.selectedFriend ? 2 : 1)
+  const [photoMode, setPhotoMode] = useState(() => loadUploadPrefs()?.photoMode ?? 'separate') // 'separate' | 'combined'
   const [friends, setFriends] = useState([])
   const [loadingFriends, setLoadingFriends] = useState(true)
-  const [selectedFriend, setSelectedFriend] = useState(null)
+  const [selectedFriend, setSelectedFriend] = useState(() => loadUploadPrefs()?.selectedFriend ?? null)
   const [playedAt, setPlayedAt] = useState(defaultPlayedAt)
 
   const [myImageFile, setMyImageFile] = useState(null)
   const [myParsedData, setMyParsedData] = useState(null)
   const [myAiFrames, setMyAiFrames] = useState(null)
-  const [myPlayerLabel, setMyPlayerLabel] = useState('')
+  const [myPlayerLabel, setMyPlayerLabel] = useState(() => loadUploadPrefs()?.myPlayerLabel ?? '')
   const [myPhase, setMyPhase] = useState('input')
   const [myError, setMyError] = useState(null)
 
   const [oppImageFile, setOppImageFile] = useState(null)
   const [oppParsedData, setOppParsedData] = useState(null)
   const [oppAiFrames, setOppAiFrames] = useState(null)
-  const [oppPlayerLabel, setOppPlayerLabel] = useState('')
+  const [oppPlayerLabel, setOppPlayerLabel] = useState(() => loadUploadPrefs()?.oppPlayerLabel ?? '')
   const [oppPhase, setOppPhase] = useState('input')
   const [oppError, setOppError] = useState(null)
 
@@ -437,6 +438,12 @@ export default function VSSubmitModal({ session, onClose, onSaved }) {
       return
     }
 
+    saveUploadPrefs({
+      selectedFriend,
+      myPlayerLabel: myPlayerLabel.trim(),
+      oppPlayerLabel: oppPlayerLabel.trim(),
+      photoMode,
+    })
     onSaved({
       submitterGame: {
         id: data.submitter_game_id,
@@ -497,6 +504,21 @@ export default function VSSubmitModal({ session, onClose, onSaved }) {
             />
           ))}
         </div>
+
+        {/* Quick-start banner — shown when opponent is pre-selected and we've moved past step 1 */}
+        {selectedFriend && step > 1 && (
+          <div className="mb-3 flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-xs">
+            <span className="text-gray-500">
+              vs <span className="font-semibold text-gray-900">{selectedFriend.display_name || selectedFriend.email}</span>
+            </span>
+            <button
+              onClick={() => setStep(1)}
+              className="font-medium text-slate-600 hover:text-slate-900 transition-colors"
+            >
+              Edit
+            </button>
+          </div>
+        )}
 
         {/* Photo mode toggle — visible on steps 1-3 */}
         {step <= 3 && (

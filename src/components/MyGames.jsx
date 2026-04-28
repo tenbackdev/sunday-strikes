@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { parseScorecard } from '../lib/gemini'
 import { computeStats, computeScores, isConvertedSplit } from '../lib/parseGame'
 import { BallMark, EditableBallInput, StatTable, FrameGrid, EditableFrameGrid } from './Scorecard'
+import { loadUploadPrefs, saveUploadPrefs } from '../lib/uploadPrefs'
 
 
 // ── Day summary helper ───────────────────────────────────────────────────────
@@ -320,7 +321,10 @@ export function UploadModal({ session, profile, onClose, onSaved }) {
   const [phase, setPhase] = useState('input')
   const [imageFile, setImageFile] = useState(null)
   const [previewUrl, setPreviewUrl] = useState(null)
-  const [playerLabel, setPlayerLabel] = useState(profile?.player_label ?? '')
+  const [playerLabel, setPlayerLabel] = useState(() => {
+    const prefs = loadUploadPrefs()
+    return prefs?.myPlayerLabel ?? profile?.player_label ?? ''
+  })
   const [playedAt, setPlayedAt] = useState(() => {
     const now = new Date()
     now.setMinutes(now.getMinutes() - now.getTimezoneOffset())
@@ -414,6 +418,7 @@ export function UploadModal({ session, profile, onClose, onSaved }) {
       return
     }
 
+    saveUploadPrefs({ myPlayerLabel: playerLabel.trim() })
     onSaved(data)
     onClose()
   }
