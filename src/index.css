@@ -1,1 +1,115 @@
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
+
+/* ─────────────────────────────────────────────
+   Tailwind v4 custom tokens
+   (generates bg-*, text-*, border-* utilities)
+───────────────────────────────────────────── */
+@theme {
+  --font-family-display: 'Bebas Neue', system-ui, sans-serif;
+  --font-family-body:    'Inter', system-ui, sans-serif;
+}
+
+/* ─────────────────────────────────────────────
+   ☀  Classic Lanes (default)
+   Maple lane surface · near-black gutter · pin white · pin-stripe red
+───────────────────────────────────────────── */
+:root {
+  --bg:          #f2e8cf;
+  --sidebar:     #0c0a07;
+  --header:      rgba(255, 253, 248, 0.96);
+  --card:        #fffdf8;
+  --elevated:    #f0e4cc;
+  --border:      #d8c8a2;
+  --text:        #1a1510;
+  --sub:         #7a5e38;
+  --accent:      #cc1507;
+  --accent-h:    #e2190a;
+  --acc-text:    #fffdf8;
+  --strike:      #cc1507;
+  --spare:       #1a60a8;
+  --win:         #1a6b2e;
+  --loss:        #b91c1c;
+  --shadow-card:   0 1px 3px rgba(0,0,0,.08), 0 4px 12px rgba(0,0,0,.06), 0 0 0 1px rgba(0,0,0,.05);
+  --shadow-float:  0 2px 6px rgba(0,0,0,.10), 0 8px 24px rgba(0,0,0,.08), 0 0 0 1px rgba(0,0,0,.06);
+  --shadow-accent: 0 0 0 1px rgba(204,21,7,.2), 0 2px 10px rgba(204,21,7,.15);
+}
+
+/* ─────────────────────────────────────────────
+   ✦  Cosmic Bowling
+   Deep navy · electric cyan · neon glow
+───────────────────────────────────────────── */
+.theme-cosmic {
+  --bg:          #06061a;
+  --sidebar:     #0a0a2a;
+  --header:      rgba(10, 10, 42, 0.92);
+  --card:        #0f0f38;
+  --elevated:    #080820;
+  --border:      #1a1a5a;
+  --text:        #ddefff;
+  --sub:         #6b8db8;
+  --accent:      #00d4ff;
+  --accent-h:    #33ddff;
+  --acc-text:    #06061a;
+  --strike:      #ff4569;
+  --spare:       #b44fff;
+  --win:         #00e676;
+  --loss:        #ff4569;
+  --shadow-card:   0 1px 3px rgba(0,0,0,.6), 0 4px 12px rgba(0,212,255,.06), 0 0 0 1px rgba(255,255,255,.04);
+  --shadow-float:  0 2px 6px rgba(0,0,0,.7), 0 8px 24px rgba(0,212,255,.08), 0 24px 48px rgba(0,0,0,.4), 0 0 0 1px rgba(255,255,255,.05);
+  --shadow-accent: 0 0 0 1px rgba(0,212,255,.3), 0 2px 12px rgba(0,212,255,.2), 0 0 24px rgba(0,212,255,.1);
+}
+
+/* ─────────────────────────────────────────────
+   Base element styles
+───────────────────────────────────────────── */
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', system-ui, sans-serif;
+  line-height: 1.6;
+  transition: background-color 0.25s, color 0.25s;
+}
+
+h1, h2, h3, .font-display {
+  font-family: 'Bebas Neue', system-ui, sans-serif;
+  letter-spacing: 0.03em;
+  line-height: 1.15;
+}
+
+/* ─────────────────────────────────────────────
+   Modal animations (transform + opacity only)
+───────────────────────────────────────────── */
+@keyframes modal-in {
+  from { opacity: 0; transform: translateY(14px) scale(0.97); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes overlay-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes slide-in-left {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
+}
+
+.modal-enter   { animation: modal-in 220ms cubic-bezier(0.32, 0.72, 0, 1) both; }
+.modal-overlay { animation: overlay-in 180ms ease both; }
+.slide-in-left { animation: slide-in-left 240ms cubic-bezier(0.32, 0.72, 0, 1) both; }
+
+/* ─────────────────────────────────────────────
+   Cosmic-only glow utilities
+───────────────────────────────────────────── */
+.theme-cosmic .accent-glow {
+  box-shadow: 0 0 16px rgba(0, 212, 255, 0.25);
+}
+.theme-cosmic .score-glow {
+  box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
+}
+
+/* ─────────────────────────────────────────────
+   Scrollbar
+───────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }

@@ -27,22 +27,37 @@ export default function UserMenu({ session }) {
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(o => !o)}
-        className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-700 text-sm font-bold text-white hover:bg-slate-600 transition-colors"
+        className="flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold transition-all"
+        style={{
+          background: 'color-mix(in srgb, var(--accent) 15%, transparent)',
+          border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)',
+          color: 'var(--accent)',
+        }}
         aria-label="User menu"
       >
         {getInitials(session)}
       </button>
 
       {open && (
-        <div className="absolute right-0 z-50 mt-2 w-60 rounded-xl border border-gray-100 bg-white p-2 shadow-lg">
+        <div
+          className="absolute right-0 z-50 mt-2 w-60 rounded-xl p-2"
+          style={{
+            background: 'var(--card)',
+            border: '1px solid var(--border)',
+            boxShadow: 'var(--shadow-float)',
+          }}
+        >
           <div className="px-3 py-2">
-            <p className="text-xs font-medium text-gray-400">Signed in as</p>
-            <p className="mt-0.5 truncate text-sm font-semibold text-gray-800">{displayName}</p>
+            <p className="text-xs font-medium" style={{ color: 'var(--sub)' }}>Signed in as</p>
+            <p className="mt-0.5 truncate text-sm font-semibold" style={{ color: 'var(--text)' }}>{displayName}</p>
           </div>
-          <hr className="my-1.5 border-gray-100" />
+          <hr className="my-1.5" style={{ borderColor: 'var(--border)' }} />
           <button
             onClick={() => { supabase.auth.signOut(); setOpen(false) }}
-            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
+            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors"
+            style={{ color: 'var(--loss)' }}
+            onMouseEnter={e => e.currentTarget.style.background = 'color-mix(in srgb, var(--loss) 8%, transparent)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
           >
             <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
