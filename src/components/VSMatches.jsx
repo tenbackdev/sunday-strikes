@@ -17,15 +17,12 @@ function computeDaySummary(games) {
   let strikes = 0, spares = 0, opens = 0, splits = 0, converted = 0
   for (const g of games) {
     const st = computeStats(g.frames ?? [])
-    strikes += st.strikes
-    spares  += st.spares
-    opens   += st.opens
-    splits    += g.frames?.filter(f => f?.split).length ?? 0
+    strikes += st.strikes; spares += st.spares; opens += st.opens
+    splits += g.frames?.filter(f => f?.split).length ?? 0
     converted += g.frames?.filter(f => isConvertedSplit(f)).length ?? 0
   }
   return {
-    count,
-    totalPins,
+    count, totalPins,
     avgScore: count > 0 ? Math.round(totalPins / count) : 0,
     highScore: count > 0 ? Math.max(...scores) : 0,
     lowScore: count > 0 ? Math.min(...scores) : 0,
@@ -38,11 +35,8 @@ function VSDaySummary({ matches, opponentName }) {
   const theirGames = matches.map(m => m.theirGame).filter(Boolean)
   const mine = computeDaySummary(myGames)
   const theirs = opponentName ? computeDaySummary(theirGames) : null
-
   const date = matches[0] ? new Date(matches[0].played_at) : null
-  const dateStr = date
-    ? date.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })
-    : ''
+  const dateStr = date ? date.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' }) : ''
 
   const statRows = [
     ['Total Pins', mine.totalPins, theirs?.totalPins],
@@ -51,30 +45,28 @@ function VSDaySummary({ matches, opponentName }) {
     ['Strikes',   mine.strikes,   theirs?.strikes],
     ['Spares',    mine.spares,    theirs?.spares],
     ['Opens',     mine.opens,     theirs?.opens],
-    ['Splits',    mine.splits,    theirs?.splits],
-    ['Converted', mine.converted, theirs?.converted],
   ]
 
   return (
-    <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-3">
+    <div className="rounded-xl px-3 py-3" style={{ background: 'var(--elevated)', border: '1px solid var(--border)' }}>
       <div className="flex items-center justify-between mb-2">
-        <p className="text-xs font-semibold text-gray-700">{dateStr}</p>
-        <p className="text-xs text-gray-400">{matches.length} match{matches.length !== 1 ? 'es' : ''}</p>
+        <p className="text-xs font-semibold" style={{ color: 'var(--text)' }}>{dateStr}</p>
+        <p className="text-xs" style={{ color: 'var(--sub)' }}>{matches.length} match{matches.length !== 1 ? 'es' : ''}</p>
       </div>
       <table className="w-full text-xs">
         <thead>
           <tr>
-            <th className="text-left font-normal text-gray-400 pb-1 w-20" />
-            <th className="text-center font-semibold text-gray-700 pb-1">You</th>
-            {theirs && <th className="text-center font-semibold text-gray-700 pb-1">{opponentName}</th>}
+            <th className="text-left font-normal pb-1 w-20" style={{ color: 'var(--sub)' }} />
+            <th className="text-center font-semibold pb-1" style={{ color: 'var(--text)' }}>You</th>
+            {theirs && <th className="text-center font-semibold pb-1" style={{ color: 'var(--text)' }}>{opponentName}</th>}
           </tr>
         </thead>
         <tbody>
           {statRows.map(([label, myVal, theirVal]) => (
             <tr key={label}>
-              <td className="text-gray-500 py-0.5">{label}</td>
-              <td className="text-center font-semibold text-gray-800 py-0.5">{myVal}</td>
-              {theirs && <td className="text-center font-semibold text-gray-600 py-0.5">{theirVal}</td>}
+              <td className="py-0.5" style={{ color: 'var(--sub)' }}>{label}</td>
+              <td className="text-center font-semibold py-0.5" style={{ color: 'var(--text)' }}>{myVal}</td>
+              {theirs && <td className="text-center font-semibold py-0.5" style={{ color: 'var(--sub)' }}>{theirVal}</td>}
             </tr>
           ))}
         </tbody>
@@ -83,65 +75,74 @@ function VSDaySummary({ matches, opponentName }) {
   )
 }
 
-function resultColor(r) {
-  if (r === 'W') return 'text-green-600 bg-green-50'
-  if (r === 'L') return 'text-red-500 bg-red-50'
-  return 'text-gray-500 bg-gray-100'
+function resultStyle(r) {
+  if (r === 'W') return { background: 'color-mix(in srgb, var(--win) 15%, transparent)', color: 'var(--win)' }
+  if (r === 'L') return { background: 'color-mix(in srgb, var(--loss) 15%, transparent)', color: 'var(--loss)' }
+  return { background: 'color-mix(in srgb, var(--sub) 12%, transparent)', color: 'var(--sub)' }
 }
 
 function StatCard({ label, value, sub }) {
   return (
-    <div className="rounded-xl border border-gray-100 bg-white px-4 py-3 text-center shadow-sm">
-      <p className="text-xs font-medium text-gray-400">{label}</p>
-      <p className="mt-0.5 text-2xl font-bold text-gray-900">{value}</p>
-      {sub && <p className="text-[10px] text-gray-400">{sub}</p>}
+    <div
+      className="rounded-xl px-4 py-3 text-center"
+      style={{ background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}
+    >
+      <p className="text-xs font-medium" style={{ color: 'var(--sub)' }}>{label}</p>
+      <p className="mt-0.5 font-display text-3xl" style={{ color: 'var(--text)' }}>{value}</p>
+      {sub && <p className="text-[10px]" style={{ color: 'var(--sub)' }}>{sub}</p>}
     </div>
   )
 }
 
-function MatchRow({ match, currentUserId }) {
+function MatchRow({ match }) {
   const [expanded, setExpanded] = useState(false)
   const date = new Date(match.played_at)
   const dateStr = date.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })
   const oppName = match.opponentProfile?.display_name || match.opponentProfile?.email || 'Opponent'
 
   return (
-    <div className="rounded-xl border border-gray-100 bg-white shadow-sm overflow-hidden">
+    <div
+      className="rounded-xl overflow-hidden"
+      style={{ background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}
+    >
       <button
         onClick={() => setExpanded(e => !e)}
         className="flex w-full items-center gap-3 px-4 py-3 text-left"
       >
-        {/* Result pill */}
-        <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${resultColor(match.result)}`}>
+        <span className="shrink-0 rounded-full px-2 py-0.5 text-xs font-bold" style={resultStyle(match.result)}>
           {match.result}
         </span>
-
-        {/* Scores */}
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-gray-900">
-            <span className={match.result === 'W' ? 'text-green-700' : match.result === 'L' ? 'text-red-600' : ''}>
+          <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
+            <span style={{ color: match.result === 'W' ? 'var(--win)' : match.result === 'L' ? 'var(--loss)' : 'var(--text)' }}>
               {match.myGame?.total_score ?? '—'}
             </span>
-            <span className="mx-1.5 text-gray-300">vs</span>
-            <span className="text-gray-600">{match.theirGame?.total_score ?? '—'}</span>
+            <span className="mx-1.5" style={{ color: 'var(--border)' }}>vs</span>
+            <span style={{ color: 'var(--sub)' }}>{match.theirGame?.total_score ?? '—'}</span>
           </p>
-          <p className="text-xs text-gray-400">{oppName} · {dateStr}</p>
+          <p className="text-xs" style={{ color: 'var(--sub)' }}>{oppName} · {dateStr}</p>
         </div>
-
-        {/* Chevron */}
-        <svg className={`h-4 w-4 shrink-0 text-gray-300 transition-transform ${expanded ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <svg
+          className={`h-4 w-4 shrink-0 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
+          viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+          style={{ color: 'var(--sub)' }}
+        >
           <polyline points="6 9 12 15 18 9" />
         </svg>
       </button>
 
       {expanded && match.myGame?.frames && match.theirGame?.frames && (
-        <div className="border-t border-gray-50 px-4 pb-4 pt-3 space-y-3">
+        <div className="px-4 pb-4 pt-3 space-y-3" style={{ borderTop: '1px solid var(--border)' }}>
           <div>
-            <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400">You — {match.myGame.total_score}</p>
+            <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--sub)' }}>
+              You — {match.myGame.total_score}
+            </p>
             <FrameGrid frames={match.myGame.frames} />
           </div>
           <div>
-            <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400">{oppName} — {match.theirGame.total_score}</p>
+            <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--sub)' }}>
+              {oppName} — {match.theirGame.total_score}
+            </p>
             <FrameGrid frames={match.theirGame.frames} />
           </div>
         </div>
@@ -157,36 +158,50 @@ function OpponentCard({ stats, onFilter, isActive }) {
   const winPct = total > 0 ? Math.round(stats.w / total * 100) : 0
   const myAvg = total > 0 ? Math.round(stats.myPins / total) : 0
   const oppAvg = total > 0 ? Math.round(stats.oppPins / total) : 0
-
-  // Last 5 results for the trend dots
   const last5 = stats.matches.slice(0, 5).map(m => m.result)
 
   return (
     <button
       onClick={onFilter}
-      className={`w-full rounded-xl border px-4 py-3 text-left transition-colors ${isActive ? 'border-slate-700 bg-slate-50' : 'border-gray-100 bg-white hover:border-gray-200'}`}
+      className="w-full rounded-xl px-4 py-3 text-left transition-colors"
+      style={{
+        border: `1px solid ${isActive ? 'var(--accent)' : 'var(--border)'}`,
+        background: isActive ? 'color-mix(in srgb, var(--accent) 6%, transparent)' : 'var(--card)',
+        boxShadow: 'var(--shadow-card)',
+      }}
     >
       <div className="flex items-center gap-3 mb-2">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-700 text-sm font-bold text-white">
+        <div
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold"
+          style={{ background: 'color-mix(in srgb, var(--accent) 15%, transparent)', color: 'var(--accent)' }}
+        >
           {initials}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-gray-900 truncate">{name}</p>
-          <p className="text-xs text-gray-400">{stats.w}W-{stats.l}L{stats.t > 0 ? `-${stats.t}T` : ''} · {winPct}% win</p>
+          <p className="text-sm font-semibold truncate" style={{ color: 'var(--text)' }}>{name}</p>
+          <p className="text-xs" style={{ color: 'var(--sub)' }}>
+            {stats.w}W-{stats.l}L{stats.t > 0 ? `-${stats.t}T` : ''} · {winPct}% win
+          </p>
         </div>
         {isActive && (
-          <svg className="h-4 w-4 shrink-0 text-slate-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ color: 'var(--accent)' }}>
             <polyline points="20 6 9 17 4 12" />
           </svg>
         )}
       </div>
-      <div className="flex items-center justify-between text-xs text-gray-500">
-        <span>Avg: <span className="font-semibold text-gray-800">{myAvg}</span> vs <span className="font-semibold text-gray-600">{oppAvg}</span></span>
+      <div className="flex items-center justify-between text-xs" style={{ color: 'var(--sub)' }}>
+        <span>
+          Avg: <span className="font-semibold" style={{ color: 'var(--text)' }}>{myAvg}</span>
+          {' '}vs <span className="font-semibold" style={{ color: 'var(--sub)' }}>{oppAvg}</span>
+        </span>
         <div className="flex gap-1">
           {last5.map((r, i) => (
             <span
               key={i}
-              className={`h-2 w-2 rounded-full ${r === 'W' ? 'bg-green-400' : r === 'L' ? 'bg-red-400' : 'bg-gray-300'}`}
+              className="h-2 w-2 rounded-full"
+              style={{
+                background: r === 'W' ? 'var(--win)' : r === 'L' ? 'var(--loss)' : 'var(--border)',
+              }}
             />
           ))}
         </div>
@@ -201,27 +216,17 @@ export default function VSMatches({ session }) {
   const [timeFilter, setTimeFilter] = useState('all')
   const [opponentFilter, setOpponentFilter] = useState(null)
 
-  useEffect(() => {
-    loadVsData()
-  }, [])
-
   async function loadVsData() {
     setLoading(true)
     const userId = session.user.id
-
     const { data: matchRows } = await supabase
       .from('vs_matches')
       .select('id, submitter_id, opponent_id, submitter_game_id, opponent_game_id, played_at')
       .or(`submitter_id.eq.${userId},opponent_id.eq.${userId}`)
       .order('played_at', { ascending: false })
 
-    if (!matchRows || matchRows.length === 0) {
-      setMatches([])
-      setLoading(false)
-      return
-    }
+    if (!matchRows || matchRows.length === 0) { setMatches([]); setLoading(false); return }
 
-    // Fetch profiles and games in parallel
     const allUserIds = [...new Set(matchRows.flatMap(m => [m.submitter_id, m.opponent_id]))]
     const allGameIds = matchRows.flatMap(m => [m.submitter_game_id, m.opponent_game_id])
 
@@ -235,10 +240,8 @@ export default function VSMatches({ session }) {
 
     const enriched = matchRows.map(m => {
       const iAmSubmitter = m.submitter_id === userId
-      const myGameId = iAmSubmitter ? m.submitter_game_id : m.opponent_game_id
-      const theirGameId = iAmSubmitter ? m.opponent_game_id : m.submitter_game_id
-      const myGame = gameMap[myGameId]
-      const theirGame = gameMap[theirGameId]
+      const myGame = gameMap[iAmSubmitter ? m.submitter_game_id : m.opponent_game_id]
+      const theirGame = gameMap[iAmSubmitter ? m.opponent_game_id : m.submitter_game_id]
       const opponentId = iAmSubmitter ? m.opponent_id : m.submitter_id
       const opponentProfile = profileMap[opponentId] ?? { id: opponentId }
       const myScore = myGame?.total_score ?? 0
@@ -251,17 +254,18 @@ export default function VSMatches({ session }) {
     setLoading(false)
   }
 
-  // Apply time filter
+  useEffect(() => { loadVsData() }, [])
+
   const now = new Date()
-  const filtered = matches.filter(m => {
+  const timeFiltered = matches.filter(m => {
     const d = new Date(m.played_at)
     if (timeFilter === 'year') return d.getFullYear() === now.getFullYear()
     if (timeFilter === '3mo') return d >= new Date(now - 90 * 86400000)
     if (timeFilter === '30d') return d >= new Date(now - 30 * 86400000)
     return true
-  }).filter(m => !opponentFilter || m.opponentProfile?.id === opponentFilter)
+  })
+  const filtered = timeFiltered.filter(m => !opponentFilter || m.opponentProfile?.id === opponentFilter)
 
-  // Overall stats
   const totalW = filtered.filter(m => m.result === 'W').length
   const totalL = filtered.filter(m => m.result === 'L').length
   const totalT = filtered.filter(m => m.result === 'T').length
@@ -270,24 +274,13 @@ export default function VSMatches({ session }) {
   const avgMyScore = total > 0 ? Math.round(filtered.reduce((s, m) => s + (m.myGame?.total_score ?? 0), 0) / total) : 0
   const totalPinDiff = filtered.reduce((s, m) => s + ((m.myGame?.total_score ?? 0) - (m.theirGame?.total_score ?? 0)), 0)
 
-  // Per-opponent breakdown (from unfiltered time but respecting time filter, excluding opponent filter)
-  const timeFiltered = matches.filter(m => {
-    const d = new Date(m.played_at)
-    if (timeFilter === 'year') return d.getFullYear() === now.getFullYear()
-    if (timeFilter === '3mo') return d >= new Date(now - 90 * 86400000)
-    if (timeFilter === '30d') return d >= new Date(now - 30 * 86400000)
-    return true
-  })
-
   const byOpponent = {}
   timeFiltered.forEach(m => {
     const key = m.opponentProfile?.id
     if (!key) return
     if (!byOpponent[key]) byOpponent[key] = { profile: m.opponentProfile, w: 0, l: 0, t: 0, myPins: 0, oppPins: 0, matches: [] }
     const b = byOpponent[key]
-    if (m.result === 'W') b.w++
-    else if (m.result === 'L') b.l++
-    else b.t++
+    if (m.result === 'W') b.w++; else if (m.result === 'L') b.l++; else b.t++
     b.myPins += m.myGame?.total_score ?? 0
     b.oppPins += m.theirGame?.total_score ?? 0
     b.matches.push(m)
@@ -295,9 +288,8 @@ export default function VSMatches({ session }) {
   const opponentStats = Object.values(byOpponent).sort((a, b) => (b.w + b.l + b.t) - (a.w + a.l + a.t))
 
   const activeOpponentName = opponentFilter
-    ? (opponentStats.find(s => s.profile?.id === opponentFilter)?.profile?.display_name ||
-       opponentStats.find(s => s.profile?.id === opponentFilter)?.profile?.email ||
-       'Opponent')
+    ? opponentStats.find(s => s.profile?.id === opponentFilter)?.profile?.display_name ||
+      opponentStats.find(s => s.profile?.id === opponentFilter)?.profile?.email || 'Opponent'
     : null
 
   const matchesByDate = filtered.reduce((acc, m) => {
@@ -307,51 +299,58 @@ export default function VSMatches({ session }) {
     return acc
   }, {})
   const matchDateGroups = Object.values(matchesByDate).sort((a, b) => b.date - a.date)
-
   const recordStr = `${totalW}W-${totalL}L${totalT > 0 ? `-${totalT}T` : ''}`
 
   if (loading) {
-    return <div className="flex justify-center py-16 text-sm text-gray-400">Loading VS history…</div>
+    return <div className="flex justify-center py-16 text-sm" style={{ color: 'var(--sub)' }}>Loading VS history…</div>
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
-        <h2 className="text-xl font-bold text-gray-900">VS Matches</h2>
-        <p className="mt-1 text-sm text-gray-500">
+        <h2 className="font-display text-3xl" style={{ color: 'var(--text)' }}>VS Matches</h2>
+        <p className="mt-1 text-sm" style={{ color: 'var(--sub)' }}>
           {matches.length === 0 ? 'No VS matches yet' : `${matches.length} match${matches.length !== 1 ? 'es' : ''} total`}
         </p>
       </div>
 
       {matches.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-200 py-16">
-          <p className="text-sm font-medium text-gray-400">No VS matches yet</p>
-          <p className="mt-1 text-xs text-gray-300">Submit a VS match from My Games to get started</p>
+        <div
+          className="flex flex-col items-center justify-center rounded-2xl py-16"
+          style={{ border: '2px dashed var(--border)' }}
+        >
+          <p className="text-sm font-medium" style={{ color: 'var(--sub)' }}>No VS matches yet</p>
+          <p className="mt-1 text-xs" style={{ color: 'color-mix(in srgb, var(--sub) 60%, transparent)' }}>Submit a VS match from My Games to get started</p>
         </div>
       ) : (
         <>
           {/* Time filter */}
-          <div className="flex gap-1 rounded-xl bg-gray-100 p-1">
+          <div className="flex gap-1 rounded-xl p-1" style={{ background: 'var(--elevated)', border: '1px solid var(--border)' }}>
             {TIME_FILTERS.map(f => (
               <button
                 key={f.key}
                 onClick={() => { setTimeFilter(f.key); setOpponentFilter(null) }}
-                className={`flex-1 rounded-lg py-1.5 text-xs font-medium transition-colors
-                  ${timeFilter === f.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                className="flex-1 rounded-lg py-1.5 text-xs font-medium transition-all"
+                style={timeFilter === f.key ? {
+                  background: 'color-mix(in srgb, var(--accent) 15%, transparent)',
+                  color: 'var(--accent)',
+                  border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)',
+                } : { color: 'var(--sub)' }}
               >
                 {f.label}
               </button>
             ))}
           </div>
 
-          {/* Friend filter pills */}
+          {/* Opponent filter pills */}
           {opponentStats.length > 1 && (
             <div className="flex gap-2 overflow-x-auto pb-0.5 -mx-1 px-1">
               <button
                 onClick={() => setOpponentFilter(null)}
-                className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors
-                  ${!opponentFilter ? 'bg-slate-800 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                className="shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-all"
+                style={!opponentFilter ? { background: 'var(--accent)', color: 'var(--acc-text)' } : {
+                  background: 'var(--elevated)', color: 'var(--sub)', border: '1px solid var(--border)',
+                }}
               >
                 All
               </button>
@@ -362,11 +361,15 @@ export default function VSMatches({ session }) {
                   <button
                     key={s.profile?.id}
                     onClick={() => setOpponentFilter(prev => prev === s.profile?.id ? null : s.profile?.id)}
-                    className={`shrink-0 flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors
-                      ${isActive ? 'bg-slate-800 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                    className="shrink-0 flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-all"
+                    style={isActive ? { background: 'var(--accent)', color: 'var(--acc-text)' } : {
+                      background: 'var(--elevated)', color: 'var(--sub)', border: '1px solid var(--border)',
+                    }}
                   >
-                    <span className={`inline-flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold
-                      ${isActive ? 'bg-white/20 text-white' : 'bg-slate-300 text-slate-700'}`}>
+                    <span
+                      className="inline-flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold"
+                      style={isActive ? { background: 'rgba(255,255,255,0.2)' } : { background: 'color-mix(in srgb, var(--sub) 20%, transparent)' }}
+                    >
                       {name.slice(0, 1).toUpperCase()}
                     </span>
                     {name.split(' ')[0]}
@@ -376,40 +379,23 @@ export default function VSMatches({ session }) {
             </div>
           )}
 
-          {/* Overall stats grid */}
+          {/* Overall stats */}
           <div className="grid grid-cols-2 gap-3">
-            <StatCard
-              label="Record"
-              value={recordStr}
-              sub={`${winPct}% win rate`}
-            />
-            <StatCard
-              label="Avg Score"
-              value={avgMyScore || '—'}
-              sub="in VS matches"
-            />
-            <StatCard
-              label="Pin Diff"
-              value={totalPinDiff > 0 ? `+${totalPinDiff}` : totalPinDiff}
-              sub={total > 0 ? `${totalPinDiff > 0 ? '+' : ''}${total > 0 ? Math.round(totalPinDiff / total) : 0} avg/game` : undefined}
-            />
-            <StatCard
-              label="Matches"
-              value={total}
-              sub={timeFilter === 'all' ? 'all time' : TIME_FILTERS.find(f => f.key === timeFilter)?.label}
-            />
+            <StatCard label="Record" value={recordStr} sub={`${winPct}% win rate`} />
+            <StatCard label="Avg Score" value={avgMyScore || '—'} sub="in VS matches" />
+            <StatCard label="Pin Diff" value={totalPinDiff > 0 ? `+${totalPinDiff}` : totalPinDiff}
+              sub={total > 0 ? `${totalPinDiff > 0 ? '+' : ''}${Math.round(totalPinDiff / total)} avg/game` : undefined} />
+            <StatCard label="Matches" value={total}
+              sub={timeFilter === 'all' ? 'all time' : TIME_FILTERS.find(f => f.key === timeFilter)?.label} />
           </div>
 
-          {/* Per-opponent breakdown */}
+          {/* Head-to-head breakdown */}
           {opponentStats.length > 0 && (
             <div>
               <div className="mb-2 flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-gray-700">Head-to-Head</h3>
+                <h3 className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Head-to-Head</h3>
                 {opponentFilter && (
-                  <button
-                    onClick={() => setOpponentFilter(null)}
-                    className="text-xs text-slate-600 hover:text-slate-800 font-medium"
-                  >
+                  <button onClick={() => setOpponentFilter(null)} className="text-xs font-medium" style={{ color: 'var(--accent)' }}>
                     Clear filter
                   </button>
                 )}
@@ -429,24 +415,23 @@ export default function VSMatches({ session }) {
 
           {/* Match history */}
           <div>
-            <h3 className="mb-2 text-sm font-semibold text-gray-700">
+            <h3 className="mb-2 text-sm font-semibold" style={{ color: 'var(--text)' }}>
               Match History
               {opponentFilter && (
-                <span className="ml-1 font-normal text-gray-400">
-                  · vs {opponentStats.find(s => s.profile?.id === opponentFilter)?.profile?.display_name ||
-                        opponentStats.find(s => s.profile?.id === opponentFilter)?.profile?.email}
+                <span className="ml-1 font-normal" style={{ color: 'var(--sub)' }}>
+                  · vs {activeOpponentName}
                 </span>
               )}
             </h3>
             {filtered.length === 0 ? (
-              <p className="py-8 text-center text-sm text-gray-400">No matches in this range</p>
+              <p className="py-8 text-center text-sm" style={{ color: 'var(--sub)' }}>No matches in this range</p>
             ) : (
               <div className="space-y-4">
                 {matchDateGroups.map(({ date, matches: dayMatches }) => (
                   <div key={date.toDateString()} className="space-y-2">
                     <VSDaySummary matches={dayMatches} opponentName={activeOpponentName} />
                     {dayMatches.map(m => (
-                      <MatchRow key={m.id} match={m} currentUserId={session.user.id} />
+                      <MatchRow key={m.id} match={m} />
                     ))}
                   </div>
                 ))}

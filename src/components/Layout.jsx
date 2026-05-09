@@ -49,40 +49,106 @@ const NAV_ITEMS = [
   },
 ]
 
-function SidebarNav({ activePage, onNavClick, vsUnreadCount }) {
+function ThemeToggle({ theme, onToggle }) {
   return (
-    <nav className="flex flex-col gap-0.5 px-3 py-3">
-      {NAV_ITEMS.map(item => (
-        <button
-          key={item.id}
-          onClick={() => onNavClick(item.id)}
-          className={`relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors text-left
-            ${activePage === item.id
-              ? 'bg-white/15 text-white'
-              : 'text-slate-400 hover:bg-white/10 hover:text-white'}`}
-        >
-          <span className="relative">
-            {item.icon}
-            {item.hasBadge && vsUnreadCount > 0 && (
-              <span className="absolute -right-1 -top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-red-500 text-[8px] font-bold text-white">
-                {vsUnreadCount > 9 ? '9+' : vsUnreadCount}
-              </span>
-            )}
-          </span>
-          {item.label}
-        </button>
-      ))}
-    </nav>
+    <button
+      onClick={onToggle}
+      title={theme === 'cosmic' ? 'Switch to Classic Lanes' : 'Switch to Cosmic Bowling'}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        width: '100%',
+        padding: '8px 12px',
+        borderRadius: '8px',
+        border: '1px solid rgba(255,255,255,0.1)',
+        background: 'rgba(255,255,255,0.05)',
+        color: 'rgba(255,255,255,0.5)',
+        fontSize: '12px',
+        fontWeight: '500',
+        cursor: 'pointer',
+        transition: 'all 0.15s',
+      }}
+    >
+      <span style={{ fontSize: '16px' }}>{theme === 'cosmic' ? '☀' : '✦'}</span>
+      <span>{theme === 'cosmic' ? 'Classic Lanes' : 'Cosmic Bowling'}</span>
+    </button>
   )
 }
 
-
-function SidebarHeader() {
+function NavItem({ item, isActive, onClick, vsUnreadCount }) {
   return (
-    <div className="flex items-center gap-3 border-b border-white/10 px-5 py-4">
-      <img src="/SundayStrikesLogo192.png" alt="Sunday Strikes" className="h-8 w-8 rounded-lg" />
-      <span className="text-base font-bold text-white">Sunday Strikes</span>
-    </div>
+    <button
+      onClick={() => onClick(item.id)}
+      className="relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-left transition-colors"
+      style={{
+        color: isActive ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.45)',
+        background: isActive ? 'rgba(255,255,255,0.08)' : 'transparent',
+        borderLeft: `2px solid ${isActive ? 'var(--accent)' : 'transparent'}`,
+      }}
+    >
+      <span className="relative">
+        {item.icon}
+        {item.hasBadge && vsUnreadCount > 0 && (
+          <span className="absolute -right-1 -top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full text-[8px] font-bold text-white"
+            style={{ background: 'var(--loss)' }}>
+            {vsUnreadCount > 9 ? '9+' : vsUnreadCount}
+          </span>
+        )}
+      </span>
+      {item.label}
+    </button>
+  )
+}
+
+function SidebarContent({ activePage, onNavClick, vsUnreadCount, theme, onThemeToggle, onUpload }) {
+  return (
+    <>
+      {/* Logo */}
+      <div className="flex items-center gap-3 px-4 py-5" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+        <img src="/SundayStrikesLogo192.png" alt="Sunday Strikes" className="h-8 w-8 rounded-lg" />
+        <span className="font-display text-xl tracking-widest" style={{ color: 'rgba(255,255,255,0.9)' }}>
+          Sunday Strikes
+        </span>
+      </div>
+
+      {/* Upload button */}
+      <div className="px-3 pt-3 pb-1">
+        <button
+          onClick={onUpload}
+          className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all active:scale-[0.98]"
+          style={{
+            background: 'var(--accent)',
+            color: 'var(--acc-text)',
+            boxShadow: 'var(--shadow-accent)',
+          }}
+        >
+          <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+            <circle cx="12" cy="13" r="4"/>
+          </svg>
+          Upload Game
+        </button>
+      </div>
+
+      {/* Nav */}
+      <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-2">
+        {NAV_ITEMS.map(item => (
+          <NavItem
+            key={item.id}
+            item={item}
+            isActive={activePage === item.id}
+            onClick={onNavClick}
+            vsUnreadCount={vsUnreadCount}
+          />
+        ))}
+      </nav>
+
+      {/* Theme toggle */}
+      <div className="px-3 pb-4">
+        <ThemeToggle theme={theme} onToggle={onThemeToggle} />
+      </div>
+    </>
   )
 }
 
@@ -90,14 +156,20 @@ export default function Layout({ session }) {
   const [activePage, setActivePage] = useState('my-games')
   const [mobileOpen, setMobileOpen] = useState(false)
   const [vsUnreadCount, setVsUnreadCount] = useState(0)
-  const [uploadStep, setUploadStep] = useState(null) // null | 'choose' | 'single' | 'vs'
+  const [uploadStep, setUploadStep] = useState(null)
   const [refreshKey, setRefreshKey] = useState(0)
   const [profile, setProfile] = useState(null)
+  const [theme, setTheme] = useState(() => localStorage.getItem('ss-theme') || 'classic')
 
+  // Apply theme class to <html>
   useEffect(() => {
-    loadVsUnreadCount()
-    loadProfile()
-  }, [])
+    const root = document.documentElement
+    if (theme === 'cosmic') {
+      root.classList.add('theme-cosmic')
+    } else {
+      root.classList.remove('theme-cosmic')
+    }
+  }, [theme])
 
   async function loadProfile() {
     const { data } = await supabase
@@ -108,15 +180,6 @@ export default function Layout({ session }) {
     setProfile(data)
   }
 
-  function openUpload() { setUploadStep('choose') }
-  function closeUpload() { setUploadStep(null) }
-
-  function handleGameSaved() {
-    setUploadStep(null)
-    setActivePage('my-games')
-    setRefreshKey(k => k + 1)
-  }
-
   async function loadVsUnreadCount() {
     const { count } = await supabase
       .from('vs_notifications')
@@ -124,6 +187,20 @@ export default function Layout({ session }) {
       .eq('user_id', session.user.id)
       .is('read_at', null)
     setVsUnreadCount(count ?? 0)
+  }
+
+  useEffect(() => {
+    loadVsUnreadCount()
+    loadProfile()
+  }, [])
+
+  function openUpload() { setUploadStep('choose') }
+  function closeUpload() { setUploadStep(null) }
+
+  function handleGameSaved() {
+    setUploadStep(null)
+    setActivePage('my-games')
+    setRefreshKey(k => k + 1)
   }
 
   async function handleNavClick(id) {
@@ -139,46 +216,55 @@ export default function Layout({ session }) {
     }
   }
 
+  function handleThemeToggle() {
+    const next = theme === 'classic' ? 'cosmic' : 'classic'
+    setTheme(next)
+    localStorage.setItem('ss-theme', next)
+  }
+
   const currentLabel = NAV_ITEMS.find(i => i.id === activePage)?.label ?? 'Sunday Strikes'
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Desktop sidebar — always visible at md+ */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col bg-slate-900 md:flex">
-        <SidebarHeader />
-        <div className="px-3 pt-3">
-          <button
-            onClick={openUpload}
-            className="flex w-full items-center gap-2 rounded-lg bg-white/10 px-3 py-2.5 text-sm font-semibold text-white hover:bg-white/20 transition-colors"
-          >
-            <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-              <circle cx="12" cy="13" r="4"/>
-            </svg>
-            Upload Game
-          </button>
-        </div>
-        <div className="flex-1 overflow-y-auto">
-          <SidebarNav activePage={activePage} onNavClick={handleNavClick} vsUnreadCount={vsUnreadCount} />
-        </div>
+    <div className="min-h-screen" style={{ background: 'var(--bg)' }}>
+
+      {/* ── Desktop sidebar ── */}
+      <aside
+        className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col md:flex"
+        style={{ background: 'var(--sidebar)', borderRight: '1px solid rgba(255,255,255,0.06)' }}
+      >
+        <SidebarContent
+          activePage={activePage}
+          onNavClick={handleNavClick}
+          vsUnreadCount={vsUnreadCount}
+          theme={theme}
+          onThemeToggle={handleThemeToggle}
+          onUpload={openUpload}
+        />
       </aside>
 
-      {/* Mobile sidebar — slide-in overlay */}
+      {/* ── Mobile sidebar overlay ── */}
       {mobileOpen && (
-        <div className="fixed inset-0 z-40 md:hidden">
+        <div className="fixed inset-0 z-40 md:hidden modal-overlay">
           <div
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            className="absolute inset-0"
+            style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
             onClick={() => setMobileOpen(false)}
           />
-          <aside className="absolute inset-y-0 left-0 flex w-72 flex-col bg-slate-900 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+          <aside
+            className="absolute inset-y-0 left-0 flex w-72 flex-col slide-in-left"
+            style={{ background: 'var(--sidebar)' }}
+          >
+            <div className="flex items-center justify-between px-4 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
               <div className="flex items-center gap-3">
                 <img src="/SundayStrikesLogo192.png" alt="Sunday Strikes" className="h-8 w-8 rounded-lg" />
-                <span className="text-base font-bold text-white">Sunday Strikes</span>
+                <span className="font-display text-xl tracking-widest" style={{ color: 'rgba(255,255,255,0.9)' }}>
+                  Sunday Strikes
+                </span>
               </div>
               <button
                 onClick={() => setMobileOpen(false)}
-                className="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 hover:text-white transition-colors"
+                className="rounded-lg p-1.5 transition-colors"
+                style={{ color: 'rgba(255,255,255,0.4)' }}
                 aria-label="Close menu"
               >
                 <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
@@ -187,10 +273,15 @@ export default function Layout({ session }) {
                 </svg>
               </button>
             </div>
-            <div className="px-3 pt-3">
+            <div className="px-3 pt-3 pb-1">
               <button
                 onClick={() => { setMobileOpen(false); openUpload() }}
-                className="flex w-full items-center gap-2 rounded-lg bg-white/10 px-3 py-2.5 text-sm font-semibold text-white hover:bg-white/20 transition-colors"
+                className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all active:scale-[0.98]"
+                style={{
+                  background: 'var(--accent)',
+                  color: 'var(--acc-text)',
+                  boxShadow: 'var(--shadow-accent)',
+                }}
               >
                 <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
@@ -199,19 +290,38 @@ export default function Layout({ session }) {
                 Upload Game
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto">
-              <SidebarNav activePage={activePage} onNavClick={handleNavClick} vsUnreadCount={vsUnreadCount} />
+            <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-2">
+              {NAV_ITEMS.map(item => (
+                <NavItem
+                  key={item.id}
+                  item={item}
+                  isActive={activePage === item.id}
+                  onClick={handleNavClick}
+                  vsUnreadCount={vsUnreadCount}
+                />
+              ))}
+            </nav>
+            <div className="px-3 pb-4">
+              <ThemeToggle theme={theme} onToggle={handleThemeToggle} />
             </div>
           </aside>
         </div>
       )}
 
-      {/* Top header bar */}
-      <header className="fixed left-0 right-0 top-0 z-20 flex h-14 items-center justify-between border-b border-gray-100 bg-white px-4 md:left-64">
+      {/* ── Top header bar ── */}
+      <header
+        className="fixed left-0 right-0 top-0 z-20 flex h-14 items-center justify-between px-4 md:left-64"
+        style={{
+          background: 'var(--header)',
+          backdropFilter: 'blur(8px)',
+          borderBottom: '1px solid var(--border)',
+        }}
+      >
         {/* Hamburger — mobile only */}
         <button
           onClick={() => setMobileOpen(true)}
-          className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 transition-colors md:hidden"
+          className="rounded-lg p-2 transition-colors md:hidden"
+          style={{ color: 'var(--sub)' }}
           aria-label="Open menu"
         >
           <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -221,26 +331,29 @@ export default function Layout({ session }) {
           </svg>
         </button>
 
-        {/* Page title — mobile center, with VS badge */}
+        {/* Page title — mobile center */}
         <div className="flex items-center gap-2 md:hidden">
-          <span className="text-sm font-semibold text-gray-700">{currentLabel}</span>
+          <span className="font-display text-lg tracking-wide" style={{ color: 'var(--text)' }}>{currentLabel}</span>
           {activePage === 'vs-matches' && vsUnreadCount > 0 && (
-            <span className="rounded-full bg-red-500 px-1.5 py-0.5 text-[9px] font-bold text-white">
+            <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold text-white" style={{ background: 'var(--loss)' }}>
               {vsUnreadCount}
             </span>
           )}
         </div>
 
-        {/* Desktop spacer */}
         <div className="hidden md:block" />
 
         <UserMenu session={session} />
       </header>
 
-      {/* FAB — mobile only */}
+      {/* ── Mobile FAB ── */}
       <button
         onClick={openUpload}
-        className="fixed bottom-6 right-6 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-slate-800 text-white shadow-lg hover:bg-slate-700 transition-colors md:hidden"
+        className="fixed bottom-6 right-6 z-30 flex h-14 w-14 items-center justify-center rounded-full text-white shadow-lg transition-all active:scale-95 md:hidden accent-glow"
+        style={{
+          background: 'var(--accent)',
+          boxShadow: 'var(--shadow-accent)',
+        }}
         aria-label="Upload game"
       >
         <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -249,7 +362,7 @@ export default function Layout({ session }) {
         </svg>
       </button>
 
-      {/* Page content */}
+      {/* ── Page content ── */}
       <main className="pt-14 md:ml-64">
         <div className="mx-auto max-w-2xl px-4 py-6 md:px-6">
           {activePage === 'my-games' && (
@@ -260,45 +373,76 @@ export default function Layout({ session }) {
         </div>
       </main>
 
-      {/* Type chooser */}
+      {/* ── Type chooser modal ── */}
       {uploadStep === 'choose' && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center">
-          <div className="w-full max-w-md rounded-t-2xl bg-white p-5 shadow-2xl sm:rounded-2xl">
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center sm:items-center modal-overlay"
+          style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)' }}
+        >
+          <div
+            className="w-full max-w-md rounded-t-2xl p-5 sm:rounded-2xl modal-enter"
+            style={{
+              background: 'var(--card)',
+              border: '1px solid var(--border)',
+              boxShadow: 'var(--shadow-float)',
+            }}
+          >
             <div className="mb-5 flex items-center justify-between">
-              <h3 className="text-base font-bold text-gray-900">Upload New Game</h3>
-              <button onClick={closeUpload} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 transition-colors">
+              <h3 className="font-display text-2xl" style={{ color: 'var(--text)' }}>Upload New Game</h3>
+              <button
+                onClick={closeUpload}
+                className="rounded-lg p-1.5 transition-colors"
+                style={{ color: 'var(--sub)' }}
+              >
                 <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                   <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
                 </svg>
               </button>
             </div>
             <div className="grid grid-cols-2 gap-3">
+              {/* Single Game */}
               <button
                 onClick={() => setUploadStep('single')}
-                className="flex flex-col items-center gap-3 rounded-2xl border-2 border-gray-100 bg-gray-50 px-4 py-6 hover:border-slate-300 hover:bg-slate-50 transition-colors"
+                className="flex flex-col items-center gap-3 rounded-2xl px-4 py-6 transition-all"
+                style={{
+                  border: '2px solid var(--border)',
+                  background: 'var(--elevated)',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--accent) 40%, transparent)'; e.currentTarget.style.background = 'color-mix(in srgb, var(--accent) 5%, transparent)' }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--elevated)' }}
               >
-                <svg className="h-8 w-8 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg className="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+                  style={{ color: 'var(--accent)' }}>
                   <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
                   <circle cx="12" cy="13" r="4"/>
                 </svg>
                 <div className="text-center">
-                  <p className="text-sm font-semibold text-gray-900">Single Game</p>
-                  <p className="mt-0.5 text-xs text-gray-400">Just you</p>
+                  <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Single Game</p>
+                  <p className="mt-0.5 text-xs" style={{ color: 'var(--sub)' }}>Just you</p>
                 </div>
               </button>
+
+              {/* VS Match */}
               <button
                 onClick={() => setUploadStep('vs')}
-                className="flex flex-col items-center gap-3 rounded-2xl border-2 border-gray-100 bg-gray-50 px-4 py-6 hover:border-slate-300 hover:bg-slate-50 transition-colors"
+                className="flex flex-col items-center gap-3 rounded-2xl px-4 py-6 transition-all"
+                style={{
+                  border: '2px solid var(--border)',
+                  background: 'var(--elevated)',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--accent) 40%, transparent)'; e.currentTarget.style.background = 'color-mix(in srgb, var(--accent) 5%, transparent)' }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--elevated)' }}
               >
-                <svg className="h-8 w-8 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg className="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+                  style={{ color: 'var(--accent)' }}>
                   <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
                   <circle cx="9" cy="7" r="4"/>
                   <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
                   <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
                 </svg>
                 <div className="text-center">
-                  <p className="text-sm font-semibold text-gray-900">VS Match</p>
-                  <p className="mt-0.5 text-xs text-gray-400">Head-to-head</p>
+                  <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>VS Match</p>
+                  <p className="mt-0.5 text-xs" style={{ color: 'var(--sub)' }}>Head-to-head</p>
                 </div>
               </button>
             </div>

@@ -11,7 +11,110 @@ function defaultPlayedAt() {
   return now.toISOString().slice(0, 16)
 }
 
-function ScorecardStep({ title, playerLabel, setPlayerLabel, imageFile, setImageFile, parsedData, setParsedData, aiFrames, setAiFrames, phase, setPhase, error, setError, labelPlaceholder }) {
+// ── Shared helpers ────────────────────────────────────────────────────────────
+
+function ThemedInput({ className = '', style = {}, ...props }) {
+  return (
+    <input
+      {...props}
+      className={`w-full rounded-lg px-3 py-2 text-sm outline-none transition-colors ${className}`}
+      style={{
+        background: 'var(--elevated)',
+        border: '1px solid var(--border)',
+        color: 'var(--text)',
+        ...style,
+      }}
+      onFocus={e => {
+        e.target.style.borderColor = 'var(--accent)'
+        e.target.style.boxShadow = '0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent)'
+      }}
+      onBlur={e => {
+        e.target.style.borderColor = 'var(--border)'
+        e.target.style.boxShadow = 'none'
+      }}
+    />
+  )
+}
+
+function PhotoZoneButton({ onClick, children }) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex flex-col items-center gap-2 rounded-xl py-4 transition-colors"
+      style={{ border: '2px dashed var(--border)' }}
+      onMouseEnter={e => e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--accent) 50%, transparent)'}
+      onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
+    >
+      {children}
+    </button>
+  )
+}
+
+function ErrorBanner({ msg }) {
+  if (!msg) return null
+  return (
+    <p className="mb-3 rounded-lg px-3 py-2 text-xs font-medium"
+      style={{ background: 'color-mix(in srgb, var(--loss) 12%, transparent)', color: 'var(--loss)' }}>
+      {msg}
+    </p>
+  )
+}
+
+// ── Stepper ───────────────────────────────────────────────────────────────────
+
+function Stepper({ steps, currentStep }) {
+  return (
+    <div className="flex items-start mb-4">
+      {steps.map((label, i) => {
+        const num = i + 1
+        const done = num < currentStep
+        const curr = num === currentStep
+        return (
+          <div key={label} className="flex flex-col items-center gap-1 flex-1 relative">
+            {/* Connector line */}
+            {i < steps.length - 1 && (
+              <div
+                className="absolute top-[11px] z-0"
+                style={{
+                  left: '58%', right: '-38%', height: '2px',
+                  background: done ? 'var(--accent)' : 'var(--border)',
+                  transition: 'background 0.3s',
+                }}
+              />
+            )}
+            {/* Circle */}
+            <div
+              className="relative z-10 flex h-[22px] w-[22px] items-center justify-center rounded-full text-[10px] font-bold transition-all"
+              style={done ? {
+                background: 'var(--accent)', color: 'var(--acc-text)',
+              } : curr ? {
+                background: 'transparent',
+                border: '2px solid var(--accent)',
+                color: 'var(--accent)',
+                boxShadow: '0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent)',
+              } : {
+                background: 'var(--border)',
+                color: 'var(--sub)',
+              }}
+            >
+              {done ? '✓' : num}
+            </div>
+            <span
+              className="text-[9px] font-medium whitespace-nowrap"
+              style={{ color: curr ? 'var(--accent)' : 'var(--sub)' }}
+            >
+              {label}
+            </span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ── Scorecard step (single player photo) ─────────────────────────────────────
+
+function ScorecardStep({ title, playerLabel, setPlayerLabel, imageFile, setImageFile, parsedData, setParsedData, setAiFrames, phase, setPhase, error, setError, labelPlaceholder }) {
   const cameraRef = useRef(null)
   const galleryRef = useRef(null)
   const [previewUrl, setPreviewUrl] = useState(null)
@@ -21,23 +124,18 @@ function ScorecardStep({ title, playerLabel, setPlayerLabel, imageFile, setImage
     if (!file) return
     setImageFile(file)
     setPreviewUrl(URL.createObjectURL(file))
-    setError(null)
-    setParsedData(null)
-    setAiFrames(null)
-    setPhase('input')
+    setError(null); setParsedData(null); setAiFrames(null); setPhase('input')
   }
 
   async function handleParse() {
     if (!imageFile) { setError('Select a photo first.'); return }
     if (!playerLabel.trim()) { setError('Enter the label shown on screen for this player.'); return }
-    setPhase('parsing')
-    setError(null)
+    setPhase('parsing'); setError(null)
     try {
       const result = await parseScorecard(imageFile, playerLabel.trim())
       if (!result.found) {
         setError(result.error || `Could not find player "${playerLabel}" in the photo.`)
-        setPhase('input')
-        return
+        setPhase('input'); return
       }
       const scored = computeScores(result.frames)
       const stats = computeStats(scored)
@@ -45,15 +143,13 @@ function ScorecardStep({ title, playerLabel, setPlayerLabel, imageFile, setImage
       setParsedData({ frames: scored, ...stats })
       setPhase('review')
     } catch (err) {
-      setError(err.message || 'Failed to parse photo.')
-      setPhase('input')
+      setError(err.message || 'Failed to parse photo.'); setPhase('input')
     }
   }
 
   function handleFramesChange(newFrames) {
     const scored = computeScores(newFrames)
-    const stats = computeStats(scored)
-    setParsedData({ frames: scored, ...stats })
+    setParsedData({ frames: scored, ...computeStats(scored) })
   }
 
   const isParsing = phase === 'parsing'
@@ -62,14 +158,15 @@ function ScorecardStep({ title, playerLabel, setPlayerLabel, imageFile, setImage
 
   return (
     <div>
-      <p className="mb-3 text-sm font-semibold text-gray-700">{title}</p>
+      <p className="mb-3 text-sm font-semibold" style={{ color: 'var(--text)' }}>{title}</p>
 
       {previewUrl ? (
         <div className="relative mb-3">
           <img src={previewUrl} alt="Scorecard" className="h-36 w-full rounded-xl object-cover" />
           <button
             onClick={() => { setPreviewUrl(null); setImageFile(null); setPhase('input'); setParsedData(null) }}
-            className="absolute right-2 top-2 rounded-full bg-black/50 p-1 text-white hover:bg-black/70 transition-colors"
+            className="absolute right-2 top-2 rounded-full p-1 text-white transition-colors"
+            style={{ background: 'rgba(0,0,0,0.5)' }}
           >
             <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
@@ -78,27 +175,21 @@ function ScorecardStep({ title, playerLabel, setPlayerLabel, imageFile, setImage
         </div>
       ) : (
         <div className="mb-3 grid grid-cols-2 gap-2">
-          <button
-            onClick={() => cameraRef.current?.click()}
-            className="flex flex-col items-center gap-2 rounded-xl border-2 border-dashed border-gray-200 py-4 hover:border-slate-400 transition-colors"
-          >
-            <svg className="h-6 w-6 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <PhotoZoneButton onClick={() => cameraRef.current?.click()}>
+            <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ color: 'var(--sub)', opacity: 0.5 }}>
               <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
               <circle cx="12" cy="13" r="4" />
             </svg>
-            <span className="text-xs font-medium text-gray-500">Take Photo</span>
-          </button>
-          <button
-            onClick={() => galleryRef.current?.click()}
-            className="flex flex-col items-center gap-2 rounded-xl border-2 border-dashed border-gray-200 py-4 hover:border-slate-400 transition-colors"
-          >
-            <svg className="h-6 w-6 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <span className="text-xs font-medium" style={{ color: 'var(--sub)' }}>Take Photo</span>
+          </PhotoZoneButton>
+          <PhotoZoneButton onClick={() => galleryRef.current?.click()}>
+            <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ color: 'var(--sub)', opacity: 0.5 }}>
               <rect x="3" y="3" width="18" height="18" rx="2" />
               <circle cx="8.5" cy="8.5" r="1.5" />
               <polyline points="21 15 16 10 5 21" />
             </svg>
-            <span className="text-xs font-medium text-gray-500">Choose Photo</span>
-          </button>
+            <span className="text-xs font-medium" style={{ color: 'var(--sub)' }}>Choose Photo</span>
+          </PhotoZoneButton>
         </div>
       )}
 
@@ -106,34 +197,29 @@ function ScorecardStep({ title, playerLabel, setPlayerLabel, imageFile, setImage
       <input ref={galleryRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
 
       <div className="mb-3">
-        <label className="mb-1 block text-xs font-medium text-gray-600">Player label on screen</label>
-        <input
+        <label className="mb-1 block text-xs font-medium" style={{ color: 'var(--sub)' }}>Player label on screen</label>
+        <ThemedInput
           type="text"
           value={playerLabel}
           onChange={e => setPlayerLabel(e.target.value.toUpperCase())}
           placeholder={labelPlaceholder ?? 'A'}
           maxLength={3}
-          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm font-mono uppercase outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+          className="font-mono uppercase"
         />
       </div>
 
-      {error && <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-600">{error}</p>}
+      <ErrorBanner msg={error} />
 
       {isReview && parsedData && (
         <div className="mb-3">
-          <div className="mb-2 flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
+          <div className="mb-2 flex items-center justify-between rounded-xl px-3 py-2" style={{ background: 'var(--elevated)' }}>
             <div className="flex items-baseline gap-1.5">
-              <span className="text-2xl font-bold text-slate-900">{totalScore}</span>
-              <span className="text-sm text-slate-500">total</span>
+              <span className="font-display text-2xl" style={{ color: 'var(--text)' }}>{totalScore}</span>
+              <span className="text-sm" style={{ color: 'var(--sub)' }}>total</span>
             </div>
-            <StatTable
-              strikes={parsedData.strikes}
-              spares={parsedData.spares}
-              opens={parsedData.opens}
-              initialRun={parsedData.initialRun}
-              frames={parsedData.frames}
-            />
+            <StatTable strikes={parsedData.strikes} spares={parsedData.spares} opens={parsedData.opens} initialRun={parsedData.initialRun} frames={parsedData.frames} />
           </div>
+          <p className="mb-2 text-[10px]" style={{ color: 'var(--sub)' }}>Tap any ball to edit</p>
           <EditableFrameGrid frames={parsedData.frames} onChange={handleFramesChange} />
         </div>
       )}
@@ -142,14 +228,16 @@ function ScorecardStep({ title, playerLabel, setPlayerLabel, imageFile, setImage
         <button
           onClick={handleParse}
           disabled={isParsing || !imageFile}
-          className="w-full rounded-xl bg-slate-800 py-2.5 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50 transition-colors"
+          className="w-full rounded-xl py-2.5 text-sm font-semibold transition-all active:scale-[0.98] disabled:opacity-50"
+          style={{ background: 'var(--accent)', color: 'var(--acc-text)' }}
         >
           {isParsing ? 'Parsing photo…' : 'Parse Score'}
         </button>
       ) : (
         <button
           onClick={() => { setPhase('input'); setParsedData(null); setPreviewUrl(null); setImageFile(null) }}
-          className="w-full rounded-xl border border-gray-200 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+          className="w-full rounded-xl py-2 text-sm font-medium transition-colors"
+          style={{ border: '1px solid var(--border)', color: 'var(--sub)' }}
         >
           Retake Photo
         </button>
@@ -158,70 +246,41 @@ function ScorecardStep({ title, playerLabel, setPlayerLabel, imageFile, setImage
   )
 }
 
-function CombinedScorecardStep({
-  myPlayerLabel, setMyPlayerLabel, myParsedData, setMyParsedData, setMyAiFrames,
-  oppPlayerLabel, setOppPlayerLabel, oppParsedData, setOppParsedData, setOppAiFrames,
-  phase, setPhase, error, setError,
-}) {
+// ── Combined scorecard step (both players, one photo) ────────────────────────
+
+function CombinedScorecardStep({ myPlayerLabel, setMyPlayerLabel, myParsedData, setMyParsedData, setMyAiFrames, oppPlayerLabel, setOppPlayerLabel, oppParsedData, setOppParsedData, setOppAiFrames, phase, setPhase, error, setError }) {
   const cameraRef = useRef(null)
   const galleryRef = useRef(null)
-  const [imageFile, setImageFile] = useState(null)
   const [previewUrl, setPreviewUrl] = useState(null)
+  const [imageFile, setImageFile] = useState(null)
 
   function handleFileSelect(e) {
     const file = e.target.files[0]
     if (!file) return
     setImageFile(file)
     setPreviewUrl(URL.createObjectURL(file))
-    setError(null)
-    setMyParsedData(null)
-    setOppParsedData(null)
-    setPhase('input')
+    setError(null); setMyParsedData(null); setOppParsedData(null); setPhase('input')
   }
 
   async function handleParse() {
     if (!imageFile) { setError('Select a photo first.'); return }
-    if (!myPlayerLabel.trim()) { setError('Enter your player label (e.g. "A").'); return }
-    if (!oppPlayerLabel.trim()) { setError('Enter the opponent\'s player label (e.g. "B").'); return }
-    if (myPlayerLabel.trim().toUpperCase() === oppPlayerLabel.trim().toUpperCase()) {
-      setError('Player labels must be different.')
-      return
-    }
-
-    setPhase('parsing')
-    setError(null)
-
+    setPhase('parsing'); setError(null)
     try {
       const result = await parseBothScorecards(imageFile, myPlayerLabel.trim(), oppPlayerLabel.trim())
       const players = result?.players ?? []
       const myRaw = players.find(p => p.label?.toUpperCase() === myPlayerLabel.trim().toUpperCase())
       const oppRaw = players.find(p => p.label?.toUpperCase() === oppPlayerLabel.trim().toUpperCase())
-
-      if (!myRaw?.found) {
-        setError(`Could not find player "${myPlayerLabel}" in the photo.`)
-        setPhase('input')
-        return
-      }
-      if (!oppRaw?.found) {
-        setError(`Could not find player "${oppPlayerLabel}" in the photo.`)
-        setPhase('input')
-        return
-      }
-
+      if (!myRaw?.found) { setError(`Could not find player "${myPlayerLabel}" in the photo.`); setPhase('input'); return }
+      if (!oppRaw?.found) { setError(`Could not find player "${oppPlayerLabel}" in the photo.`); setPhase('input'); return }
       const myScored = computeScores(myRaw.frames)
-      const myStats = computeStats(myScored)
-      setMyAiFrames(JSON.parse(JSON.stringify(myScored)))
-      setMyParsedData({ frames: myScored, ...myStats })
-
       const oppScored = computeScores(oppRaw.frames)
-      const oppStats = computeStats(oppScored)
+      setMyAiFrames(JSON.parse(JSON.stringify(myScored)))
+      setMyParsedData({ frames: myScored, ...computeStats(myScored) })
       setOppAiFrames(JSON.parse(JSON.stringify(oppScored)))
-      setOppParsedData({ frames: oppScored, ...oppStats })
-
+      setOppParsedData({ frames: oppScored, ...computeStats(oppScored) })
       setPhase('review')
     } catch (err) {
-      setError(err.message || 'Failed to parse photo.')
-      setPhase('input')
+      setError(err.message || 'Failed to parse photo.'); setPhase('input')
     }
   }
 
@@ -229,7 +288,6 @@ function CombinedScorecardStep({
     const scored = computeScores(newFrames)
     setMyParsedData(prev => ({ ...prev, frames: scored, ...computeStats(scored) }))
   }
-
   function handleOppFramesChange(newFrames) {
     const scored = computeScores(newFrames)
     setOppParsedData(prev => ({ ...prev, frames: scored, ...computeStats(scored) }))
@@ -240,14 +298,15 @@ function CombinedScorecardStep({
 
   return (
     <div>
-      <p className="mb-3 text-sm font-semibold text-gray-700">Both scorecards — one photo</p>
+      <p className="mb-3 text-sm font-semibold" style={{ color: 'var(--text)' }}>Both scorecards — one photo</p>
 
       {previewUrl ? (
         <div className="relative mb-3">
           <img src={previewUrl} alt="Scorecard" className="h-36 w-full rounded-xl object-cover" />
           <button
             onClick={() => { setPreviewUrl(null); setImageFile(null); setPhase('input'); setMyParsedData(null); setOppParsedData(null) }}
-            className="absolute right-2 top-2 rounded-full bg-black/50 p-1 text-white hover:bg-black/70 transition-colors"
+            className="absolute right-2 top-2 rounded-full p-1 text-white"
+            style={{ background: 'rgba(0,0,0,0.5)' }}
           >
             <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
@@ -256,21 +315,21 @@ function CombinedScorecardStep({
         </div>
       ) : (
         <div className="mb-3 grid grid-cols-2 gap-2">
-          <button onClick={() => cameraRef.current?.click()} className="flex flex-col items-center gap-2 rounded-xl border-2 border-dashed border-gray-200 py-4 hover:border-slate-400 transition-colors">
-            <svg className="h-6 w-6 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-              <circle cx="12" cy="13" r="4" />
+          <PhotoZoneButton onClick={() => cameraRef.current?.click()}>
+            <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ color: 'var(--sub)', opacity: 0.5 }}>
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+              <circle cx="12" cy="13" r="4"/>
             </svg>
-            <span className="text-xs font-medium text-gray-500">Take Photo</span>
-          </button>
-          <button onClick={() => galleryRef.current?.click()} className="flex flex-col items-center gap-2 rounded-xl border-2 border-dashed border-gray-200 py-4 hover:border-slate-400 transition-colors">
-            <svg className="h-6 w-6 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <rect x="3" y="3" width="18" height="18" rx="2" />
-              <circle cx="8.5" cy="8.5" r="1.5" />
-              <polyline points="21 15 16 10 5 21" />
+            <span className="text-xs font-medium" style={{ color: 'var(--sub)' }}>Take Photo</span>
+          </PhotoZoneButton>
+          <PhotoZoneButton onClick={() => galleryRef.current?.click()}>
+            <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ color: 'var(--sub)', opacity: 0.5 }}>
+              <rect x="3" y="3" width="18" height="18" rx="2"/>
+              <circle cx="8.5" cy="8.5" r="1.5"/>
+              <polyline points="21 15 16 10 5 21"/>
             </svg>
-            <span className="text-xs font-medium text-gray-500">Choose Photo</span>
-          </button>
+            <span className="text-xs font-medium" style={{ color: 'var(--sub)' }}>Choose Photo</span>
+          </PhotoZoneButton>
         </div>
       )}
 
@@ -279,31 +338,29 @@ function CombinedScorecardStep({
 
       <div className="mb-3 grid grid-cols-2 gap-3">
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-600">Your label on screen</label>
-          <input type="text" value={myPlayerLabel} onChange={e => setMyPlayerLabel(e.target.value.toUpperCase())} placeholder="A" maxLength={3}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm font-mono uppercase outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100" />
+          <label className="mb-1 block text-xs font-medium" style={{ color: 'var(--sub)' }}>Your label on screen</label>
+          <ThemedInput type="text" value={myPlayerLabel} onChange={e => setMyPlayerLabel(e.target.value.toUpperCase())} placeholder="A" maxLength={3} className="font-mono uppercase" />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-600">Opponent's label</label>
-          <input type="text" value={oppPlayerLabel} onChange={e => setOppPlayerLabel(e.target.value.toUpperCase())} placeholder="B" maxLength={3}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm font-mono uppercase outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100" />
+          <label className="mb-1 block text-xs font-medium" style={{ color: 'var(--sub)' }}>Opponent's label</label>
+          <ThemedInput type="text" value={oppPlayerLabel} onChange={e => setOppPlayerLabel(e.target.value.toUpperCase())} placeholder="P" maxLength={3} className="font-mono uppercase" />
         </div>
       </div>
 
-      {error && <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-600">{error}</p>}
+      <ErrorBanner msg={error} />
 
       {isReview && myParsedData && oppParsedData && (
         <div className="mb-3 space-y-4">
           <div>
-            <div className="mb-1.5 flex items-center justify-between rounded-lg bg-slate-50 px-3 py-1.5">
-              <span className="text-xs font-semibold text-gray-700">You — {myParsedData.frames[9]?.runningScore ?? 0}</span>
-              <span className="text-[10px] text-gray-400">Tap any ball to edit</span>
+            <div className="mb-1.5 flex items-center justify-between rounded-lg px-3 py-1.5" style={{ background: 'var(--elevated)' }}>
+              <span className="text-xs font-semibold" style={{ color: 'var(--text)' }}>You — {myParsedData.frames[9]?.runningScore ?? 0}</span>
+              <span className="text-[10px]" style={{ color: 'var(--sub)' }}>Tap any ball to edit</span>
             </div>
             <EditableFrameGrid frames={myParsedData.frames} onChange={handleMyFramesChange} />
           </div>
           <div>
-            <div className="mb-1.5 flex items-center justify-between rounded-lg bg-slate-50 px-3 py-1.5">
-              <span className="text-xs font-semibold text-gray-700">Opponent — {oppParsedData.frames[9]?.runningScore ?? 0}</span>
+            <div className="mb-1.5 flex items-center justify-between rounded-lg px-3 py-1.5" style={{ background: 'var(--elevated)' }}>
+              <span className="text-xs font-semibold" style={{ color: 'var(--text)' }}>Opponent — {oppParsedData.frames[9]?.runningScore ?? 0}</span>
             </div>
             <EditableFrameGrid frames={oppParsedData.frames} onChange={handleOppFramesChange} />
           </div>
@@ -311,13 +368,20 @@ function CombinedScorecardStep({
       )}
 
       {!isReview ? (
-        <button onClick={handleParse} disabled={isParsing || !imageFile}
-          className="w-full rounded-xl bg-slate-800 py-2.5 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50 transition-colors">
+        <button
+          onClick={handleParse}
+          disabled={isParsing || !imageFile}
+          className="w-full rounded-xl py-2.5 text-sm font-semibold transition-all active:scale-[0.98] disabled:opacity-50"
+          style={{ background: 'var(--accent)', color: 'var(--acc-text)' }}
+        >
           {isParsing ? 'Parsing both scores…' : 'Parse Both Scores'}
         </button>
       ) : (
-        <button onClick={() => { setPhase('input'); setMyParsedData(null); setOppParsedData(null); setPreviewUrl(null); setImageFile(null) }}
-          className="w-full rounded-xl border border-gray-200 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">
+        <button
+          onClick={() => { setPhase('input'); setMyParsedData(null); setOppParsedData(null); setPreviewUrl(null); setImageFile(null) }}
+          className="w-full rounded-xl py-2 text-sm font-medium transition-colors"
+          style={{ border: '1px solid var(--border)', color: 'var(--sub)' }}
+        >
           Retake Photo
         </button>
       )}
@@ -325,9 +389,11 @@ function CombinedScorecardStep({
   )
 }
 
+// ── Main modal ────────────────────────────────────────────────────────────────
+
 export default function VSSubmitModal({ session, onClose, onSaved }) {
   const [step, setStep] = useState(() => loadUploadPrefs()?.selectedFriend ? 2 : 1)
-  const [photoMode, setPhotoMode] = useState(() => loadUploadPrefs()?.photoMode ?? 'separate') // 'separate' | 'combined'
+  const [photoMode, setPhotoMode] = useState(() => loadUploadPrefs()?.photoMode ?? 'separate')
   const [friends, setFriends] = useState([])
   const [loadingFriends, setLoadingFriends] = useState(true)
   const [selectedFriend, setSelectedFriend] = useState(() => loadUploadPrefs()?.selectedFriend ?? null)
@@ -347,10 +413,8 @@ export default function VSSubmitModal({ session, onClose, onSaved }) {
   const [oppPhase, setOppPhase] = useState('input')
   const [oppError, setOppError] = useState(null)
 
-  // Combined photo mode uses a shared phase/error
   const [combinedPhase, setCombinedPhase] = useState('input')
   const [combinedError, setCombinedError] = useState(null)
-
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState(null)
 
@@ -358,26 +422,21 @@ export default function VSSubmitModal({ session, onClose, onSaved }) {
     async function loadFriends() {
       const { data } = await supabase
         .from('friend_requests')
-        .select(`
-          id, sender_id, receiver_id,
-          sender:sender_id(id, display_name, email),
-          receiver:receiver_id(id, display_name, email)
-        `)
+        .select(`id, sender_id, receiver_id, sender:sender_id(id, display_name, email), receiver:receiver_id(id, display_name, email)`)
         .eq('status', 'accepted')
         .or(`sender_id.eq.${session.user.id},receiver_id.eq.${session.user.id}`)
-      const list = (data || []).map(r =>
-        r.sender_id === session.user.id ? r.receiver : r.sender
-      ).filter(Boolean)
+      const list = (data || []).map(r => r.sender_id === session.user.id ? r.receiver : r.sender)
       setFriends(list)
       setLoadingFriends(false)
     }
     loadFriends()
   }, [])
 
-  // separate: 5 steps; combined: 4 steps (step 3 handles both scorecards)
   const STEPS = photoMode === 'combined' ? 4 : 5
+  const STEP_LABELS = photoMode === 'combined'
+    ? ['Opponent', 'When', 'Scorecards', 'Summary']
+    : ['Opponent', 'When', 'Your Score', 'Their Score', 'Summary']
 
-  // Maps step number to logical content based on mode
   function stepContent(s) {
     if (s === 1) return 'opponent'
     if (s === 2) return 'datetime'
@@ -409,62 +468,31 @@ export default function VSSubmitModal({ session, onClose, onSaved }) {
   }
 
   async function handleSave() {
-    setSaving(true)
-    setSaveError(null)
-
+    setSaving(true); setSaveError(null)
     const myFramesEdited = myAiFrames && JSON.stringify(myParsedData.frames) !== JSON.stringify(myAiFrames)
     const oppFramesEdited = oppAiFrames && JSON.stringify(oppParsedData.frames) !== JSON.stringify(oppAiFrames)
-
     const { data, error } = await supabase.rpc('create_vs_match', {
       p_submitter_game: {
-        total_score: myScore,
-        player_label: myPlayerLabel.trim(),
-        frames: myParsedData.frames,
+        total_score: myScore, player_label: myPlayerLabel.trim(), frames: myParsedData.frames,
         ...(myFramesEdited ? { ai_frames: myAiFrames } : {}),
       },
       p_opponent_game: {
-        total_score: oppScore,
-        player_label: oppPlayerLabel.trim(),
-        frames: oppParsedData.frames,
+        total_score: oppScore, player_label: oppPlayerLabel.trim(), frames: oppParsedData.frames,
         ...(oppFramesEdited ? { ai_frames: oppAiFrames } : {}),
       },
       p_opponent_id: selectedFriend.id,
       p_played_at: new Date(playedAt).toISOString(),
     })
-
-    if (error) {
-      setSaveError('Failed to save match: ' + error.message)
-      setSaving(false)
-      return
-    }
-
-    saveUploadPrefs({
-      selectedFriend,
-      myPlayerLabel: myPlayerLabel.trim(),
-      oppPlayerLabel: oppPlayerLabel.trim(),
-      photoMode,
-    })
+    if (error) { setSaveError('Failed to save match: ' + error.message); setSaving(false); return }
+    saveUploadPrefs({ selectedFriend, myPlayerLabel: myPlayerLabel.trim(), oppPlayerLabel: oppPlayerLabel.trim(), photoMode })
     onSaved({
       submitterGame: {
-        id: data.submitter_game_id,
-        user_id: session.user.id,
-        played_at: new Date(playedAt).toISOString(),
-        total_score: myScore,
-        player_label: myPlayerLabel.trim(),
-        strikes: myParsedData.strikes,
-        spares: myParsedData.spares,
-        opens: myParsedData.opens,
-        initial_run: myParsedData.initialRun,
-        frames: myParsedData.frames,
-        is_vs: true,
-        vs_match_id: data.vs_match_id,
+        id: data.submitter_game_id, user_id: session.user.id, played_at: new Date(playedAt).toISOString(),
+        total_score: myScore, player_label: myPlayerLabel.trim(), ...computeStats(myParsedData.frames),
+        frames: myParsedData.frames, is_vs: true, vs_match_id: data.vs_match_id,
         ...(myFramesEdited ? { ai_frames: myAiFrames } : {}),
       },
-      vsMatch: {
-        id: data.vs_match_id,
-        submitter_game_id: data.submitter_game_id,
-        opponent_game_id: data.opponent_game_id,
-      },
+      vsMatch: { id: data.vs_match_id, submitter_game_id: data.submitter_game_id, opponent_game_id: data.opponent_game_id },
     })
     onClose()
   }
@@ -478,62 +506,56 @@ export default function VSSubmitModal({ session, onClose, onSaved }) {
   )
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center">
-      <div className="w-full max-w-md rounded-t-2xl bg-white p-5 shadow-2xl sm:rounded-2xl max-h-[92vh] overflow-y-auto">
-
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center sm:items-center modal-overlay"
+      style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)' }}
+    >
+      <div
+        className="w-full max-w-md rounded-t-2xl p-5 sm:rounded-2xl max-h-[92vh] overflow-y-auto modal-enter"
+        style={{ background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-float)' }}
+      >
         {/* Header */}
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-base font-bold text-gray-900">VS Match</h3>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 transition-colors">
+          <h3 className="font-display text-2xl" style={{ color: 'var(--text)' }}>VS Match</h3>
+          <button onClick={onClose} className="rounded-lg p-1.5 transition-colors" style={{ color: 'var(--sub)' }}>
             <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           </button>
         </div>
 
-        {/* Step dots */}
-        <div className="mb-3 flex items-center justify-center gap-2">
-          {Array.from({ length: STEPS }, (_, i) => (
-            <div
-              key={i}
-              className={`h-2 rounded-full transition-all ${
-                i + 1 < step ? 'w-2 bg-slate-700' :
-                i + 1 === step ? 'w-4 bg-slate-800' :
-                'w-2 bg-gray-200'
-              }`}
-            />
-          ))}
-        </div>
+        {/* Stepper */}
+        <Stepper steps={STEP_LABELS} currentStep={step} />
 
-        {/* Quick-start banner — shown when opponent is pre-selected and we've moved past step 1 */}
+        {/* Quick-start banner */}
         {selectedFriend && step > 1 && (
-          <div className="mb-3 flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-xs">
-            <span className="text-gray-500">
-              vs <span className="font-semibold text-gray-900">{selectedFriend.display_name || selectedFriend.email}</span>
+          <div
+            className="mb-3 flex items-center justify-between rounded-lg px-3 py-2 text-xs"
+            style={{ background: 'var(--elevated)', border: '1px solid var(--border)' }}
+          >
+            <span style={{ color: 'var(--sub)' }}>
+              vs <span className="font-semibold" style={{ color: 'var(--text)' }}>{selectedFriend.display_name || selectedFriend.email}</span>
             </span>
-            <button
-              onClick={() => setStep(1)}
-              className="font-medium text-slate-600 hover:text-slate-900 transition-colors"
-            >
+            <button onClick={() => setStep(1)} className="font-medium transition-colors" style={{ color: 'var(--accent)' }}>
               Edit
             </button>
           </div>
         )}
 
-        {/* Photo mode toggle — visible on steps 1-3 */}
+        {/* Photo mode toggle (steps 1-3) */}
         {step <= 3 && (
-          <div className="mb-4 flex rounded-lg border border-gray-200 p-0.5">
+          <div className="mb-4 flex rounded-lg p-0.5" style={{ border: '1px solid var(--border)', background: 'var(--elevated)' }}>
             <button
               onClick={() => handleModeChange('separate')}
-              className={`flex-1 rounded-md py-1.5 text-xs font-medium transition-colors
-                ${photoMode === 'separate' ? 'bg-slate-800 text-white' : 'text-gray-500 hover:text-gray-700'}`}
+              className="flex-1 rounded-md py-1.5 text-xs font-medium transition-colors"
+              style={photoMode === 'separate' ? { background: 'var(--accent)', color: 'var(--acc-text)' } : { color: 'var(--sub)' }}
             >
               Two photos
             </button>
             <button
               onClick={() => handleModeChange('combined')}
-              className={`flex-1 rounded-md py-1.5 text-xs font-medium transition-colors
-                ${photoMode === 'combined' ? 'bg-slate-800 text-white' : 'text-gray-500 hover:text-gray-700'}`}
+              className="flex-1 rounded-md py-1.5 text-xs font-medium transition-colors"
+              style={photoMode === 'combined' ? { background: 'var(--accent)', color: 'var(--acc-text)' } : { color: 'var(--sub)' }}
             >
               One photo
             </button>
@@ -543,11 +565,11 @@ export default function VSSubmitModal({ session, onClose, onSaved }) {
         {/* Step 1: Pick opponent */}
         {currentContent === 'opponent' && (
           <div>
-            <p className="mb-3 text-sm font-semibold text-gray-700">Who did you bowl against?</p>
+            <p className="mb-3 text-sm font-semibold" style={{ color: 'var(--text)' }}>Who did you bowl against?</p>
             {loadingFriends ? (
-              <p className="py-6 text-center text-sm text-gray-400">Loading friends…</p>
+              <p className="py-6 text-center text-sm" style={{ color: 'var(--sub)' }}>Loading friends…</p>
             ) : friends.length === 0 ? (
-              <p className="py-6 text-center text-sm text-gray-400">No friends yet. Add friends first.</p>
+              <p className="py-6 text-center text-sm" style={{ color: 'var(--sub)' }}>No friends yet. Add friends first.</p>
             ) : (
               <div className="space-y-2 max-h-64 overflow-y-auto">
                 {friends.map(f => {
@@ -558,20 +580,24 @@ export default function VSSubmitModal({ session, onClose, onSaved }) {
                     <button
                       key={f.id}
                       onClick={() => setSelectedFriend(f)}
-                      className={`flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors
-                        ${isSelected
-                          ? 'border-slate-700 bg-slate-50'
-                          : 'border-gray-100 bg-white hover:border-gray-300'}`}
+                      className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left transition-colors"
+                      style={{
+                        border: `1px solid ${isSelected ? 'var(--accent)' : 'var(--border)'}`,
+                        background: isSelected ? 'color-mix(in srgb, var(--accent) 6%, transparent)' : 'var(--elevated)',
+                      }}
                     >
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-700 text-sm font-bold text-white">
+                      <div
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold"
+                        style={{ background: 'color-mix(in srgb, var(--accent) 15%, transparent)', color: 'var(--accent)' }}
+                      >
                         {initials}
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold text-gray-900 truncate">{name}</p>
-                        {f.display_name && <p className="text-xs text-gray-400 truncate">{f.email}</p>}
+                        <p className="text-sm font-semibold truncate" style={{ color: 'var(--text)' }}>{name}</p>
+                        {f.display_name && <p className="text-xs truncate" style={{ color: 'var(--sub)' }}>{f.email}</p>}
                       </div>
                       {isSelected && (
-                        <svg className="ml-auto h-4 w-4 shrink-0 text-slate-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <svg className="ml-auto h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ color: 'var(--accent)' }}>
                           <polyline points="20 6 9 17 4 12" />
                         </svg>
                       )}
@@ -586,16 +612,9 @@ export default function VSSubmitModal({ session, onClose, onSaved }) {
         {/* Step 2: Date & time */}
         {currentContent === 'datetime' && (
           <div>
-            <p className="mb-3 text-sm font-semibold text-gray-700">When did you bowl?</p>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-gray-600">Date &amp; time played</label>
-              <input
-                type="datetime-local"
-                value={playedAt}
-                onChange={e => setPlayedAt(e.target.value)}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
-              />
-            </div>
+            <p className="mb-3 text-sm font-semibold" style={{ color: 'var(--text)' }}>When did you bowl?</p>
+            <label className="mb-1 block text-xs font-medium" style={{ color: 'var(--sub)' }}>Date &amp; time played</label>
+            <ThemedInput type="datetime-local" value={playedAt} onChange={e => setPlayedAt(e.target.value)} />
           </div>
         )}
 
@@ -603,23 +622,17 @@ export default function VSSubmitModal({ session, onClose, onSaved }) {
         {currentContent === 'mycard' && (
           <ScorecardStep
             title="Your scorecard"
-            playerLabel={myPlayerLabel}
-            setPlayerLabel={setMyPlayerLabel}
-            imageFile={myImageFile}
-            setImageFile={setMyImageFile}
-            parsedData={myParsedData}
-            setParsedData={setMyParsedData}
-            aiFrames={myAiFrames}
-            setAiFrames={setMyAiFrames}
-            phase={myPhase}
-            setPhase={setMyPhase}
-            error={myError}
-            setError={setMyError}
+            playerLabel={myPlayerLabel} setPlayerLabel={setMyPlayerLabel}
+            imageFile={myImageFile} setImageFile={setMyImageFile}
+            parsedData={myParsedData} setParsedData={setMyParsedData}
+            aiFrames={myAiFrames} setAiFrames={setMyAiFrames}
+            phase={myPhase} setPhase={setMyPhase}
+            error={myError} setError={setMyError}
             labelPlaceholder="A"
           />
         )}
 
-        {/* Step 3 (combined): Both scorecards in one photo */}
+        {/* Step 3 (combined): Both scorecards */}
         {currentContent === 'both' && (
           <CombinedScorecardStep
             myPlayerLabel={myPlayerLabel} setMyPlayerLabel={setMyPlayerLabel}
@@ -635,47 +648,70 @@ export default function VSSubmitModal({ session, onClose, onSaved }) {
         {currentContent === 'oppcard' && (
           <ScorecardStep
             title={`${selectedFriend?.display_name || selectedFriend?.email || 'Opponent'}'s scorecard`}
-            playerLabel={oppPlayerLabel}
-            setPlayerLabel={setOppPlayerLabel}
-            imageFile={oppImageFile}
-            setImageFile={setOppImageFile}
-            parsedData={oppParsedData}
-            setParsedData={setOppParsedData}
-            aiFrames={oppAiFrames}
-            setAiFrames={setOppAiFrames}
-            phase={oppPhase}
-            setPhase={setOppPhase}
-            error={oppError}
-            setError={setOppError}
-            labelPlaceholder="B"
+            playerLabel={oppPlayerLabel} setPlayerLabel={setOppPlayerLabel}
+            imageFile={oppImageFile} setImageFile={setOppImageFile}
+            parsedData={oppParsedData} setParsedData={setOppParsedData}
+            aiFrames={oppAiFrames} setAiFrames={setOppAiFrames}
+            phase={oppPhase} setPhase={setOppPhase}
+            error={oppError} setError={setOppError}
+            labelPlaceholder="P"
           />
         )}
 
-        {/* Summary & confirm */}
+        {/* Summary */}
         {currentContent === 'summary' && (
           <div>
-            <p className="mb-4 text-sm font-semibold text-gray-700">Match summary</p>
+            <p className="mb-4 text-sm font-semibold" style={{ color: 'var(--text)' }}>Match summary</p>
             <div className="grid grid-cols-2 gap-3 mb-4">
               {/* My side */}
-              <div className={`rounded-xl border-2 p-3 text-center ${winner === 'me' ? 'border-green-400 bg-green-50' : winner === 'tie' ? 'border-gray-300 bg-gray-50' : 'border-gray-100 bg-white'}`}>
-                <p className="text-xs font-medium text-gray-500 mb-1">You</p>
-                <p className={`text-3xl font-bold ${winner === 'me' ? 'text-green-700' : winner === 'tie' ? 'text-gray-700' : 'text-gray-900'}`}>{myScore}</p>
-                {winner === 'me' && <p className="mt-1 text-xs font-bold text-green-600">WIN</p>}
-                {winner === 'tie' && <p className="mt-1 text-xs font-bold text-gray-500">TIE</p>}
-                {winner === 'them' && <p className="mt-1 text-xs font-bold text-red-500">LOSS</p>}
+              <div
+                className="rounded-xl p-3 text-center"
+                style={{
+                  border: `2px solid ${winner === 'me' ? 'var(--accent)' : winner === 'tie' ? 'var(--border)' : 'color-mix(in srgb, var(--loss) 30%, transparent)'}`,
+                  background: winner === 'me' ? 'color-mix(in srgb, var(--accent) 6%, transparent)' : 'var(--elevated)',
+                  boxShadow: winner === 'me' ? 'var(--shadow-accent)' : 'none',
+                }}
+              >
+                <p className="text-xs font-medium mb-1" style={{ color: 'var(--sub)' }}>You</p>
+                <p className="font-display text-4xl leading-none mb-1"
+                  style={{ color: winner === 'me' ? 'var(--accent)' : winner === 'tie' ? 'var(--text)' : 'var(--sub)' }}>
+                  {myScore}
+                </p>
+                <span className="inline-block rounded-full px-2 py-0.5 text-[11px] font-bold mt-1 font-display tracking-wider"
+                  style={winner === 'me' ? { background: 'var(--accent)', color: 'var(--acc-text)' } :
+                    winner === 'tie' ? { background: 'color-mix(in srgb, var(--sub) 15%, transparent)', color: 'var(--sub)' } :
+                    { background: 'color-mix(in srgb, var(--loss) 15%, transparent)', color: 'var(--loss)' }}>
+                  {winner === 'me' ? 'WIN' : winner === 'tie' ? 'TIE' : 'LOSS'}
+                </span>
                 {myParsedData && (
                   <div className="mt-2 overflow-x-auto">
                     <FrameGrid frames={myParsedData.frames} />
                   </div>
                 )}
               </div>
+
               {/* Opponent side */}
-              <div className={`rounded-xl border-2 p-3 text-center ${winner === 'them' ? 'border-green-400 bg-green-50' : winner === 'tie' ? 'border-gray-300 bg-gray-50' : 'border-gray-100 bg-white'}`}>
-                <p className="text-xs font-medium text-gray-500 mb-1 truncate">{selectedFriend?.display_name || selectedFriend?.email || 'Opponent'}</p>
-                <p className={`text-3xl font-bold ${winner === 'them' ? 'text-green-700' : winner === 'tie' ? 'text-gray-700' : 'text-gray-900'}`}>{oppScore}</p>
-                {winner === 'them' && <p className="mt-1 text-xs font-bold text-green-600">WIN</p>}
-                {winner === 'tie' && <p className="mt-1 text-xs font-bold text-gray-500">TIE</p>}
-                {winner === 'me' && <p className="mt-1 text-xs font-bold text-red-500">LOSS</p>}
+              <div
+                className="rounded-xl p-3 text-center"
+                style={{
+                  border: `2px solid ${winner === 'them' ? 'var(--accent)' : winner === 'tie' ? 'var(--border)' : 'color-mix(in srgb, var(--loss) 30%, transparent)'}`,
+                  background: winner === 'them' ? 'color-mix(in srgb, var(--accent) 6%, transparent)' : 'var(--elevated)',
+                  boxShadow: winner === 'them' ? 'var(--shadow-accent)' : 'none',
+                }}
+              >
+                <p className="text-xs font-medium mb-1 truncate" style={{ color: 'var(--sub)' }}>
+                  {selectedFriend?.display_name || selectedFriend?.email || 'Opponent'}
+                </p>
+                <p className="font-display text-4xl leading-none mb-1"
+                  style={{ color: winner === 'them' ? 'var(--accent)' : winner === 'tie' ? 'var(--text)' : 'var(--sub)' }}>
+                  {oppScore}
+                </p>
+                <span className="inline-block rounded-full px-2 py-0.5 text-[11px] font-bold mt-1 font-display tracking-wider"
+                  style={winner === 'them' ? { background: 'var(--accent)', color: 'var(--acc-text)' } :
+                    winner === 'tie' ? { background: 'color-mix(in srgb, var(--sub) 15%, transparent)', color: 'var(--sub)' } :
+                    { background: 'color-mix(in srgb, var(--loss) 15%, transparent)', color: 'var(--loss)' }}>
+                  {winner === 'them' ? 'WIN' : winner === 'tie' ? 'TIE' : 'LOSS'}
+                </span>
                 {oppParsedData && (
                   <div className="mt-2 overflow-x-auto">
                     <FrameGrid frames={oppParsedData.frames} />
@@ -683,7 +719,7 @@ export default function VSSubmitModal({ session, onClose, onSaved }) {
                 )}
               </div>
             </div>
-            {saveError && <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-600">{saveError}</p>}
+            <ErrorBanner msg={saveError} />
           </div>
         )}
 
@@ -693,7 +729,8 @@ export default function VSSubmitModal({ session, onClose, onSaved }) {
             <button
               onClick={() => setStep(s => s - 1)}
               disabled={saving}
-              className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+              className="flex-1 rounded-xl py-2.5 text-sm font-medium transition-colors disabled:opacity-50"
+              style={{ border: '1px solid var(--border)', color: 'var(--sub)' }}
             >
               Back
             </button>
@@ -702,7 +739,8 @@ export default function VSSubmitModal({ session, onClose, onSaved }) {
             <button
               onClick={() => setStep(s => s + 1)}
               disabled={!canGoNext}
-              className="flex-1 rounded-xl bg-slate-800 py-2.5 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50 transition-colors"
+              className="flex-1 rounded-xl py-2.5 text-sm font-semibold transition-all active:scale-[0.98] disabled:opacity-50"
+              style={{ background: 'var(--accent)', color: 'var(--acc-text)' }}
             >
               Next
             </button>
@@ -710,7 +748,8 @@ export default function VSSubmitModal({ session, onClose, onSaved }) {
             <button
               onClick={handleSave}
               disabled={saving}
-              className="flex-1 rounded-xl bg-slate-800 py-2.5 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50 transition-colors"
+              className="flex-1 rounded-xl py-2.5 text-sm font-semibold transition-all active:scale-[0.98] disabled:opacity-50"
+              style={{ background: 'var(--accent)', color: 'var(--acc-text)' }}
             >
               {saving ? 'Saving…' : 'Save Match'}
             </button>
