@@ -45,7 +45,7 @@ function ThemedInput({ className = '', style = {}, ...props }) {
   return (
     <input
       {...props}
-      className={`w-full rounded-lg px-3 py-2 text-sm outline-none transition-colors ${className}`}
+      className={`w-full rounded-lg px-3 py-2 text-base outline-none transition-colors ${className}`}
       style={{
         background: 'var(--elevated)',
         border: '1px solid var(--border)',
@@ -61,6 +61,80 @@ function ThemedInput({ className = '', style = {}, ...props }) {
         e.target.style.boxShadow = 'none'
       }}
     />
+  )
+}
+
+// ── Label chip (tap-to-edit player label) ────────────────────────────────────
+
+function LabelChip({ value, onChange, placeholder }) {
+  const [editing, setEditing] = useState(!value)
+
+  if (editing || !value) {
+    return (
+      <ThemedInput
+        type="text"
+        value={value}
+        onChange={e => onChange(e.target.value.toUpperCase())}
+        placeholder={placeholder ?? 'A'}
+        maxLength={3}
+        className="font-mono uppercase"
+        autoFocus
+        onBlur={() => { if (value) setEditing(false) }}
+      />
+    )
+  }
+  return (
+    <button
+      onClick={() => setEditing(true)}
+      className="inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 font-bold tracking-widest transition-all active:scale-95"
+      style={{
+        background: 'color-mix(in srgb, var(--accent) 15%, transparent)',
+        color: 'var(--accent)',
+        border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)',
+        fontFamily: 'var(--font-display)',
+        fontSize: '1rem',
+      }}
+    >
+      {value}
+      <svg className="h-3 w-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+      </svg>
+    </button>
+  )
+}
+
+// ── Datetime disclosure ───────────────────────────────────────────────────────
+
+function DateTimeDisclosure({ playedAt, setPlayedAt }) {
+  const [showEdit, setShowEdit] = useState(false)
+
+  const formattedTime = (() => {
+    try { return new Date(playedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }
+    catch { return playedAt }
+  })()
+
+  return (
+    <div className="rounded-lg px-3 py-2.5" style={{ background: 'var(--elevated)', border: '1px solid var(--border)' }}>
+      {showEdit ? (
+        <div>
+          <div className="mb-1.5 flex items-center justify-between">
+            <label className="text-xs font-medium" style={{ color: 'var(--sub)' }}>Date &amp; time played</label>
+            <button onClick={() => setShowEdit(false)} className="text-xs" style={{ color: 'var(--accent)' }}>Done</button>
+          </div>
+          <ThemedInput type="datetime-local" value={playedAt} onChange={e => setPlayedAt(e.target.value)} />
+        </div>
+      ) : (
+        <div className="flex items-center justify-between">
+          <span className="text-xs" style={{ color: 'var(--sub)' }}>
+            Bowled at <span className="font-semibold" style={{ color: 'var(--text)' }}>{formattedTime}</span>
+          </span>
+          <button onClick={() => setShowEdit(true)} className="text-xs font-medium" style={{ color: 'var(--accent)' }}>
+            Change →
+          </button>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -587,26 +661,12 @@ export function UploadModal({ session, profile, onClose, onSaved }) {
       <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileSelect} />
       <input ref={galleryInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
 
-      <div className="mb-3 grid grid-cols-2 gap-3">
+      <div className="mb-3 space-y-2">
         <div>
           <label className="mb-1 block text-xs font-medium" style={{ color: 'var(--sub)' }}>Your label on screen</label>
-          <ThemedInput
-            type="text"
-            value={playerLabel}
-            onChange={e => setPlayerLabel(e.target.value.toUpperCase())}
-            placeholder="A"
-            maxLength={3}
-            className="font-mono uppercase"
-          />
+          <LabelChip value={playerLabel} onChange={setPlayerLabel} placeholder="A" />
         </div>
-        <div>
-          <label className="mb-1 block text-xs font-medium" style={{ color: 'var(--sub)' }}>Date &amp; time played</label>
-          <ThemedInput
-            type="datetime-local"
-            value={playedAt}
-            onChange={e => setPlayedAt(e.target.value)}
-          />
-        </div>
+        <DateTimeDisclosure playedAt={playedAt} setPlayedAt={setPlayedAt} />
       </div>
 
       {error && (
