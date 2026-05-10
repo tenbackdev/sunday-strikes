@@ -151,7 +151,7 @@ function MatchRow({ match }) {
   )
 }
 
-function OpponentCard({ stats, onFilter, isActive }) {
+function OpponentCard({ stats, onFilter, isActive, statView, onStatViewChange }) {
   const name = stats.profile?.display_name || stats.profile?.email || 'Opponent'
   const initials = name.slice(0, 2).toUpperCase()
   const total = stats.w + stats.l + stats.t
@@ -160,17 +160,33 @@ function OpponentCard({ stats, onFilter, isActive }) {
   const oppAvg = total > 0 ? Math.round(stats.oppPins / total) : 0
   const last5 = stats.matches.slice(0, 5).map(m => m.result)
 
+  const mySparePct = (stats.mySpares + stats.myOpens) > 0
+    ? Math.round(stats.mySpares / (stats.mySpares + stats.myOpens) * 100) : 0
+  const oppSparePct = (stats.oppSpares + stats.oppOpens) > 0
+    ? Math.round(stats.oppSpares / (stats.oppSpares + stats.oppOpens) * 100) : 0
+
+  const statModes = [
+    { key: 'record', label: 'W/L' },
+    { key: 'pins',   label: 'Pins' },
+    { key: 'strikes', label: 'Strikes' },
+    { key: 'spares', label: 'Spares' },
+  ]
+
   return (
-    <button
-      onClick={onFilter}
-      className="w-full rounded-xl px-4 py-3 text-left transition-colors"
+    <div
+      className="w-full rounded-xl px-4 py-3 transition-colors"
       style={{
         border: `1px solid ${isActive ? 'var(--accent)' : 'var(--border)'}`,
         background: isActive ? 'color-mix(in srgb, var(--accent) 6%, transparent)' : 'var(--card)',
         boxShadow: 'var(--shadow-card)',
       }}
     >
-      <div className="flex items-center gap-3 mb-2">
+      {/* Tappable top row — triggers filter */}
+      <button
+        onClick={onFilter}
+        className="flex w-full items-center gap-3 mb-2 text-left"
+        style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+      >
         <div
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold"
           style={{ background: 'color-mix(in srgb, var(--accent) 15%, transparent)', color: 'var(--accent)' }}
@@ -188,25 +204,79 @@ function OpponentCard({ stats, onFilter, isActive }) {
             <polyline points="20 6 9 17 4 12" />
           </svg>
         )}
+      </button>
+
+      {/* Stat view toggle */}
+      <div className="mb-2 flex gap-0.5 rounded-lg p-0.5" style={{ background: 'var(--elevated)', border: '1px solid var(--border)' }}>
+        {statModes.map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => onStatViewChange(key)}
+            className="flex-1 rounded-md py-1 text-[10px] font-semibold uppercase tracking-wide transition-colors"
+            style={statView === key
+              ? { background: 'var(--accent)', color: 'var(--acc-text)' }
+              : { color: 'var(--sub)' }}
+          >
+            {label}
+          </button>
+        ))}
       </div>
-      <div className="flex items-center justify-between text-xs" style={{ color: 'var(--sub)' }}>
-        <span>
-          Avg: <span className="font-semibold" style={{ color: 'var(--text)' }}>{myAvg}</span>
-          {' '}vs <span className="font-semibold" style={{ color: 'var(--sub)' }}>{oppAvg}</span>
-        </span>
-        <div className="flex gap-1">
-          {last5.map((r, i) => (
-            <span
-              key={i}
-              className="h-2 w-2 rounded-full"
-              style={{
-                background: r === 'W' ? 'var(--win)' : r === 'L' ? 'var(--loss)' : 'var(--border)',
-              }}
-            />
-          ))}
+
+      {/* Stat display */}
+      {statView === 'record' && (
+        <div className="flex items-center justify-between text-xs" style={{ color: 'var(--sub)' }}>
+          <span>
+            Avg: <span className="font-semibold" style={{ color: 'var(--text)' }}>{myAvg}</span>
+            {' '}vs <span className="font-semibold" style={{ color: 'var(--sub)' }}>{oppAvg}</span>
+          </span>
+          <div className="flex gap-1">
+            {last5.map((r, i) => (
+              <span key={i} className="inline-block h-2 w-2 rounded-full"
+                style={{ background: r === 'W' ? 'var(--win)' : r === 'L' ? 'var(--loss)' : 'var(--border)' }} />
+            ))}
+          </div>
         </div>
-      </div>
-    </button>
+      )}
+
+      {statView === 'pins' && (
+        <div className="flex items-center justify-between text-xs" style={{ color: 'var(--sub)' }}>
+          <span>
+            Me: <span className="font-semibold" style={{ color: 'var(--text)' }}>{stats.myPins}</span>
+            {' '}pins · <span className="font-semibold" style={{ color: 'var(--text)' }}>{myAvg}</span>/game
+          </span>
+          <span>
+            Them: <span className="font-semibold" style={{ color: 'var(--sub)' }}>{stats.oppPins}</span>
+            {' '}· <span className="font-semibold" style={{ color: 'var(--sub)' }}>{oppAvg}</span>/game
+          </span>
+        </div>
+      )}
+
+      {statView === 'strikes' && (
+        <div className="flex items-center justify-between text-xs" style={{ color: 'var(--sub)' }}>
+          <span>
+            Me: <span className="font-semibold" style={{ color: 'var(--text)' }}>{stats.myStrikes}</span>
+            {' '}X · <span className="font-semibold" style={{ color: 'var(--text)' }}>{total > 0 ? (stats.myStrikes / total).toFixed(1) : '—'}</span>/game
+          </span>
+          <span>
+            Them: <span className="font-semibold" style={{ color: 'var(--sub)' }}>{stats.oppStrikes}</span>
+            {' '}· <span className="font-semibold" style={{ color: 'var(--sub)' }}>{total > 0 ? (stats.oppStrikes / total).toFixed(1) : '—'}</span>/game
+          </span>
+        </div>
+      )}
+
+      {statView === 'spares' && (
+        <div className="flex items-center justify-between text-xs" style={{ color: 'var(--sub)' }}>
+          <span>
+            Me: <span className="font-semibold" style={{ color: 'var(--text)' }}>{mySparePct}%</span>
+            {' '}<span style={{ color: 'color-mix(in srgb, var(--sub) 60%, transparent)' }}>({stats.mySpares}/{stats.mySpares + stats.myOpens})</span>
+          </span>
+          <span>
+            Them: <span className="font-semibold" style={{ color: 'var(--sub)' }}>{oppSparePct}%</span>
+            {' '}<span style={{ color: 'color-mix(in srgb, var(--sub) 60%, transparent)' }}>({stats.oppSpares}/{stats.oppSpares + stats.oppOpens})</span>
+          </span>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -215,6 +285,8 @@ export default function VSMatches({ session }) {
   const [loading, setLoading] = useState(true)
   const [timeFilter, setTimeFilter] = useState('all')
   const [opponentFilter, setOpponentFilter] = useState(null)
+  const [cardStatView, setCardStatView] = useState({})
+  const getCardView = id => cardStatView[id] ?? 'record'
 
   async function loadVsData() {
     setLoading(true)
@@ -278,11 +350,26 @@ export default function VSMatches({ session }) {
   timeFiltered.forEach(m => {
     const key = m.opponentProfile?.id
     if (!key) return
-    if (!byOpponent[key]) byOpponent[key] = { profile: m.opponentProfile, w: 0, l: 0, t: 0, myPins: 0, oppPins: 0, matches: [] }
+    if (!byOpponent[key]) byOpponent[key] = {
+      profile: m.opponentProfile, w: 0, l: 0, t: 0,
+      myPins: 0, oppPins: 0,
+      myStrikes: 0, oppStrikes: 0,
+      mySpares: 0, oppSpares: 0,
+      myOpens: 0, oppOpens: 0,
+      matches: [],
+    }
     const b = byOpponent[key]
     if (m.result === 'W') b.w++; else if (m.result === 'L') b.l++; else b.t++
     b.myPins += m.myGame?.total_score ?? 0
     b.oppPins += m.theirGame?.total_score ?? 0
+    if (m.myGame?.frames) {
+      const s = computeStats(m.myGame.frames)
+      b.myStrikes += s.strikes; b.mySpares += s.spares; b.myOpens += s.opens
+    }
+    if (m.theirGame?.frames) {
+      const s = computeStats(m.theirGame.frames)
+      b.oppStrikes += s.strikes; b.oppSpares += s.spares; b.oppOpens += s.opens
+    }
     b.matches.push(m)
   })
   const opponentStats = Object.values(byOpponent).sort((a, b) => (b.w + b.l + b.t) - (a.w + a.l + a.t))
@@ -407,6 +494,8 @@ export default function VSMatches({ session }) {
                     stats={s}
                     isActive={opponentFilter === s.profile?.id}
                     onFilter={() => setOpponentFilter(prev => prev === s.profile?.id ? null : s.profile?.id)}
+                    statView={getCardView(s.profile?.id)}
+                    onStatViewChange={mode => setCardStatView(prev => ({ ...prev, [s.profile?.id]: mode }))}
                   />
                 ))}
               </div>

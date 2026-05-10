@@ -44,10 +44,13 @@ export function EditableBallInput({ value, onChange, disabled }) {
           }
         }
       }}
-      className="rounded border text-center text-xs font-bold outline-none transition-colors"
+      className="rounded border text-center font-bold outline-none transition-colors"
       style={{
         width: '30px',
         height: '30px',
+        fontSize: '16px',
+        transform: 'scale(0.75)',
+        transformOrigin: 'center',
         ...inputStyle,
         opacity: disabled ? 0.25 : 1,
         cursor: disabled ? 'not-allowed' : 'text',
@@ -209,7 +212,7 @@ export function EditableFrameGrid({ frames, onChange }) {
     <div
       data-frame-grid
       className="overflow-x-auto rounded-lg"
-      style={{ border: borderStyle, background: 'var(--elevated)' }}
+      style={{ border: borderStyle, background: 'var(--elevated)', touchAction: 'pan-x' }}
     >
       <div className="flex min-w-max">
         {frames.map((frame, fi) => {

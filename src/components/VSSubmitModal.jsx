@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import { parseScorecard, parseBothScorecards } from '../lib/gemini'
 import { computeStats, computeScores } from '../lib/parseGame'
 import { StatTable, FrameGrid, EditableFrameGrid } from './Scorecard'
-import { loadUploadPrefs, saveUploadPrefs } from '../lib/uploadPrefs'
+import { loadUploadPrefs, saveUploadPrefs, loadOpponentPref, saveOpponentPref } from '../lib/uploadPrefs'
 
 function defaultPlayedAt() {
   const now = new Date()
@@ -17,7 +17,7 @@ function ThemedInput({ className = '', style = {}, ...props }) {
   return (
     <input
       {...props}
-      className={`w-full rounded-lg px-3 py-2 text-sm outline-none transition-colors ${className}`}
+      className={`w-full rounded-lg px-3 py-2 text-base outline-none transition-colors ${className}`}
       style={{
         background: 'var(--elevated)',
         border: '1px solid var(--border)',
@@ -198,14 +198,7 @@ function ScorecardStep({ title, playerLabel, setPlayerLabel, imageFile, setImage
 
       <div className="mb-3">
         <label className="mb-1 block text-xs font-medium" style={{ color: 'var(--sub)' }}>Player label on screen</label>
-        <ThemedInput
-          type="text"
-          value={playerLabel}
-          onChange={e => setPlayerLabel(e.target.value.toUpperCase())}
-          placeholder={labelPlaceholder ?? 'A'}
-          maxLength={3}
-          className="font-mono uppercase"
-        />
+        <LabelChip value={playerLabel} onChange={setPlayerLabel} placeholder={labelPlaceholder ?? 'A'} />
       </div>
 
       <ErrorBanner msg={error} />
@@ -339,11 +332,11 @@ function CombinedScorecardStep({ myPlayerLabel, setMyPlayerLabel, myParsedData, 
       <div className="mb-3 grid grid-cols-2 gap-3">
         <div>
           <label className="mb-1 block text-xs font-medium" style={{ color: 'var(--sub)' }}>Your label on screen</label>
-          <ThemedInput type="text" value={myPlayerLabel} onChange={e => setMyPlayerLabel(e.target.value.toUpperCase())} placeholder="A" maxLength={3} className="font-mono uppercase" />
+          <LabelChip value={myPlayerLabel} onChange={setMyPlayerLabel} placeholder="A" />
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium" style={{ color: 'var(--sub)' }}>Opponent's label</label>
-          <ThemedInput type="text" value={oppPlayerLabel} onChange={e => setOppPlayerLabel(e.target.value.toUpperCase())} placeholder="P" maxLength={3} className="font-mono uppercase" />
+          <LabelChip value={oppPlayerLabel} onChange={setOppPlayerLabel} placeholder="P" />
         </div>
       </div>
 
@@ -389,14 +382,147 @@ function CombinedScorecardStep({ myPlayerLabel, setMyPlayerLabel, myParsedData, 
   )
 }
 
+// ── Label chip (tap-to-edit player label) ────────────────────────────────────
+
+function LabelChip({ value, onChange, placeholder }) {
+  const [editing, setEditing] = useState(!value)
+
+  if (editing || !value) {
+    return (
+      <ThemedInput
+        type="text"
+        value={value}
+        onChange={e => onChange(e.target.value.toUpperCase())}
+        placeholder={placeholder ?? 'A'}
+        maxLength={3}
+        className="font-mono uppercase"
+        autoFocus
+        onBlur={() => { if (value) setEditing(false) }}
+      />
+    )
+  }
+  return (
+    <button
+      onClick={() => setEditing(true)}
+      className="inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 font-bold tracking-widest transition-all active:scale-95"
+      style={{
+        background: 'color-mix(in srgb, var(--accent) 15%, transparent)',
+        color: 'var(--accent)',
+        border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)',
+        fontFamily: 'var(--font-display)',
+        fontSize: '1rem',
+      }}
+    >
+      {value}
+      <svg className="h-3 w-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+      </svg>
+    </button>
+  )
+}
+
+// ── Setup step (opponent + datetime, merged) ──────────────────────────────────
+
+function SetupStep({ friends, loadingFriends, selectedFriend, setSelectedFriend, playedAt, setPlayedAt, onNext, myPlayerLabel, oppPlayerLabel }) {
+  const [showDateEdit, setShowDateEdit] = useState(false)
+
+  const formattedTime = (() => {
+    try {
+      return new Date(playedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    } catch { return playedAt }
+  })()
+
+  const allPreFilled = selectedFriend && myPlayerLabel && oppPlayerLabel
+
+  return (
+    <div>
+      <p className="mb-3 text-sm font-semibold" style={{ color: 'var(--text)' }}>Who did you bowl against?</p>
+
+      {allPreFilled && (
+        <div
+          className="mb-3 flex items-center justify-between rounded-lg px-3 py-2 text-xs"
+          style={{ background: 'color-mix(in srgb, var(--win) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--win) 20%, transparent)' }}
+        >
+          <span style={{ color: 'var(--sub)' }}>Ready — tap <strong style={{ color: 'var(--text)' }}>Next</strong> to add photos</span>
+          <button onClick={onNext} className="font-semibold" style={{ color: 'var(--win)' }}>Next →</button>
+        </div>
+      )}
+
+      {loadingFriends ? (
+        <p className="py-6 text-center text-sm" style={{ color: 'var(--sub)' }}>Loading friends…</p>
+      ) : friends.length === 0 ? (
+        <p className="py-6 text-center text-sm" style={{ color: 'var(--sub)' }}>No friends yet. Add friends first.</p>
+      ) : (
+        <div className="mb-4 space-y-2 max-h-56 overflow-y-auto">
+          {friends.map(f => {
+            const name = f.display_name || f.email || 'Unknown'
+            const initials = name.slice(0, 2).toUpperCase()
+            const isSelected = selectedFriend?.id === f.id
+            return (
+              <button
+                key={f.id}
+                onClick={() => setSelectedFriend(f)}
+                className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left transition-colors"
+                style={{
+                  border: `1px solid ${isSelected ? 'var(--accent)' : 'var(--border)'}`,
+                  background: isSelected ? 'color-mix(in srgb, var(--accent) 6%, transparent)' : 'var(--elevated)',
+                }}
+              >
+                <div
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold"
+                  style={{ background: 'color-mix(in srgb, var(--accent) 15%, transparent)', color: 'var(--accent)' }}
+                >
+                  {initials}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold truncate" style={{ color: 'var(--text)' }}>{name}</p>
+                  {f.display_name && <p className="text-xs truncate" style={{ color: 'var(--sub)' }}>{f.email}</p>}
+                </div>
+                {isSelected && (
+                  <svg className="ml-auto h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ color: 'var(--accent)' }}>
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Datetime disclosure */}
+      <div className="rounded-lg px-3 py-2.5" style={{ background: 'var(--elevated)', border: '1px solid var(--border)' }}>
+        {showDateEdit ? (
+          <div>
+            <div className="mb-1.5 flex items-center justify-between">
+              <label className="text-xs font-medium" style={{ color: 'var(--sub)' }}>Date &amp; time played</label>
+              <button onClick={() => setShowDateEdit(false)} className="text-xs" style={{ color: 'var(--accent)' }}>Done</button>
+            </div>
+            <ThemedInput type="datetime-local" value={playedAt} onChange={e => setPlayedAt(e.target.value)} />
+          </div>
+        ) : (
+          <div className="flex items-center justify-between">
+            <span className="text-xs" style={{ color: 'var(--sub)' }}>
+              Bowled at <span className="font-semibold" style={{ color: 'var(--text)' }}>{formattedTime}</span>
+            </span>
+            <button onClick={() => setShowDateEdit(true)} className="text-xs font-medium" style={{ color: 'var(--accent)' }}>
+              Change →
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Main modal ────────────────────────────────────────────────────────────────
 
 export default function VSSubmitModal({ session, onClose, onSaved }) {
-  const [step, setStep] = useState(() => loadUploadPrefs()?.selectedFriend ? 2 : 1)
+  const [step, setStep] = useState(() => loadOpponentPref() ? 2 : 1)
   const [photoMode, setPhotoMode] = useState(() => loadUploadPrefs()?.photoMode ?? 'separate')
   const [friends, setFriends] = useState([])
   const [loadingFriends, setLoadingFriends] = useState(true)
-  const [selectedFriend, setSelectedFriend] = useState(() => loadUploadPrefs()?.selectedFriend ?? null)
+  const [selectedFriend, setSelectedFriend] = useState(() => loadOpponentPref() ?? null)
   const [playedAt, setPlayedAt] = useState(defaultPlayedAt)
 
   const [myImageFile, setMyImageFile] = useState(null)
@@ -432,21 +558,20 @@ export default function VSSubmitModal({ session, onClose, onSaved }) {
     loadFriends()
   }, [])
 
-  const STEPS = photoMode === 'combined' ? 4 : 5
+  const STEPS = photoMode === 'combined' ? 3 : 4
   const STEP_LABELS = photoMode === 'combined'
-    ? ['Opponent', 'When', 'Scorecards', 'Summary']
-    : ['Opponent', 'When', 'Your Score', 'Their Score', 'Summary']
+    ? ['Setup', 'Scorecards', 'Summary']
+    : ['Setup', 'Your Score', 'Their Score', 'Summary']
 
   function stepContent(s) {
-    if (s === 1) return 'opponent'
-    if (s === 2) return 'datetime'
+    if (s === 1) return 'setup'
     if (photoMode === 'combined') {
-      if (s === 3) return 'both'
-      if (s === 4) return 'summary'
+      if (s === 2) return 'both'
+      if (s === 3) return 'summary'
     } else {
-      if (s === 3) return 'mycard'
-      if (s === 4) return 'oppcard'
-      if (s === 5) return 'summary'
+      if (s === 2) return 'mycard'
+      if (s === 3) return 'oppcard'
+      if (s === 4) return 'summary'
     }
   }
   const currentContent = stepContent(step)
@@ -464,7 +589,7 @@ export default function VSSubmitModal({ session, onClose, onSaved }) {
   function handleModeChange(mode) {
     setPhotoMode(mode)
     resetScorecardState()
-    if (step > 2) setStep(3)
+    if (step > 1) setStep(2)
   }
 
   async function handleSave() {
@@ -484,7 +609,8 @@ export default function VSSubmitModal({ session, onClose, onSaved }) {
       p_played_at: new Date(playedAt).toISOString(),
     })
     if (error) { setSaveError('Failed to save match: ' + error.message); setSaving(false); return }
-    saveUploadPrefs({ selectedFriend, myPlayerLabel: myPlayerLabel.trim(), oppPlayerLabel: oppPlayerLabel.trim(), photoMode })
+    saveOpponentPref(selectedFriend)
+    saveUploadPrefs({ myPlayerLabel: myPlayerLabel.trim(), oppPlayerLabel: oppPlayerLabel.trim(), photoMode })
     onSaved({
       submitterGame: {
         id: data.submitter_game_id, user_id: session.user.id, played_at: new Date(playedAt).toISOString(),
@@ -498,8 +624,7 @@ export default function VSSubmitModal({ session, onClose, onSaved }) {
   }
 
   const canGoNext = (
-    (currentContent === 'opponent' && selectedFriend) ||
-    currentContent === 'datetime' ||
+    (currentContent === 'setup' && !!selectedFriend) ||
     (currentContent === 'mycard' && myPhase === 'review' && myParsedData) ||
     (currentContent === 'oppcard' && oppPhase === 'review' && oppParsedData) ||
     (currentContent === 'both' && combinedPhase === 'review' && myParsedData && oppParsedData)
@@ -511,7 +636,7 @@ export default function VSSubmitModal({ session, onClose, onSaved }) {
       style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)' }}
     >
       <div
-        className="w-full max-w-md rounded-t-2xl p-5 sm:rounded-2xl max-h-[92vh] overflow-y-auto modal-enter"
+        className="w-full max-w-md rounded-t-2xl p-5 sm:rounded-2xl max-h-[92vh] overflow-y-auto modal-enter modal-grain"
         style={{ background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-float)' }}
       >
         {/* Header */}
@@ -542,8 +667,8 @@ export default function VSSubmitModal({ session, onClose, onSaved }) {
           </div>
         )}
 
-        {/* Photo mode toggle (steps 1-3) */}
-        {step <= 3 && (
+        {/* Photo mode toggle (steps 1-2) */}
+        {step <= 2 && (
           <div className="mb-4 flex rounded-lg p-0.5" style={{ border: '1px solid var(--border)', background: 'var(--elevated)' }}>
             <button
               onClick={() => handleModeChange('separate')}
@@ -562,60 +687,19 @@ export default function VSSubmitModal({ session, onClose, onSaved }) {
           </div>
         )}
 
-        {/* Step 1: Pick opponent */}
-        {currentContent === 'opponent' && (
-          <div>
-            <p className="mb-3 text-sm font-semibold" style={{ color: 'var(--text)' }}>Who did you bowl against?</p>
-            {loadingFriends ? (
-              <p className="py-6 text-center text-sm" style={{ color: 'var(--sub)' }}>Loading friends…</p>
-            ) : friends.length === 0 ? (
-              <p className="py-6 text-center text-sm" style={{ color: 'var(--sub)' }}>No friends yet. Add friends first.</p>
-            ) : (
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {friends.map(f => {
-                  const name = f.display_name || f.email || 'Unknown'
-                  const initials = name.slice(0, 2).toUpperCase()
-                  const isSelected = selectedFriend?.id === f.id
-                  return (
-                    <button
-                      key={f.id}
-                      onClick={() => setSelectedFriend(f)}
-                      className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left transition-colors"
-                      style={{
-                        border: `1px solid ${isSelected ? 'var(--accent)' : 'var(--border)'}`,
-                        background: isSelected ? 'color-mix(in srgb, var(--accent) 6%, transparent)' : 'var(--elevated)',
-                      }}
-                    >
-                      <div
-                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold"
-                        style={{ background: 'color-mix(in srgb, var(--accent) 15%, transparent)', color: 'var(--accent)' }}
-                      >
-                        {initials}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold truncate" style={{ color: 'var(--text)' }}>{name}</p>
-                        {f.display_name && <p className="text-xs truncate" style={{ color: 'var(--sub)' }}>{f.email}</p>}
-                      </div>
-                      {isSelected && (
-                        <svg className="ml-auto h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ color: 'var(--accent)' }}>
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                      )}
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Step 2: Date & time */}
-        {currentContent === 'datetime' && (
-          <div>
-            <p className="mb-3 text-sm font-semibold" style={{ color: 'var(--text)' }}>When did you bowl?</p>
-            <label className="mb-1 block text-xs font-medium" style={{ color: 'var(--sub)' }}>Date &amp; time played</label>
-            <ThemedInput type="datetime-local" value={playedAt} onChange={e => setPlayedAt(e.target.value)} />
-          </div>
+        {/* Step 1: Setup (opponent + datetime combined) */}
+        {currentContent === 'setup' && (
+          <SetupStep
+            friends={friends}
+            loadingFriends={loadingFriends}
+            selectedFriend={selectedFriend}
+            setSelectedFriend={setSelectedFriend}
+            playedAt={playedAt}
+            setPlayedAt={setPlayedAt}
+            onNext={() => setStep(2)}
+            myPlayerLabel={myPlayerLabel}
+            oppPlayerLabel={oppPlayerLabel}
+          />
         )}
 
         {/* Step 3 (separate): Your scorecard */}
