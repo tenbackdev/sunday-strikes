@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import MyGames, { UploadModal } from './MyGames'
 import FindFriends from './FindFriends'
 import VSMatches from './VSMatches'
 import VSSubmitModal from './VSSubmitModal'
 import UserMenu from './UserMenu'
+import SettingsModal from './SettingsModal'
 
 const NAV_ITEMS = [
   {
@@ -49,32 +50,6 @@ const NAV_ITEMS = [
   },
 ]
 
-function ThemeToggle({ theme, onToggle }) {
-  return (
-    <button
-      onClick={onToggle}
-      title={theme === 'cosmic' ? 'Switch to Classic Lanes' : 'Switch to Cosmic Bowling'}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        width: '100%',
-        padding: '8px 12px',
-        borderRadius: '8px',
-        border: '1px solid rgba(255,255,255,0.1)',
-        background: 'rgba(255,255,255,0.05)',
-        color: 'rgba(255,255,255,0.5)',
-        fontSize: '12px',
-        fontWeight: '500',
-        cursor: 'pointer',
-        transition: 'all 0.15s',
-      }}
-    >
-      <span style={{ fontSize: '16px' }}>{theme === 'cosmic' ? '☀' : '✦'}</span>
-      <span>{theme === 'cosmic' ? 'Classic Lanes' : 'Cosmic Bowling'}</span>
-    </button>
-  )
-}
 
 function NavItem({ item, isActive, onClick, vsUnreadCount }) {
   return (
@@ -101,7 +76,7 @@ function NavItem({ item, isActive, onClick, vsUnreadCount }) {
   )
 }
 
-function SidebarContent({ activePage, onNavClick, vsUnreadCount, theme, onThemeToggle, onUpload }) {
+function SidebarContent({ activePage, onNavClick, vsUnreadCount, onUpload }) {
   return (
     <>
       {/* Logo */}
@@ -142,11 +117,6 @@ function SidebarContent({ activePage, onNavClick, vsUnreadCount, theme, onThemeT
           />
         ))}
       </nav>
-
-      {/* Theme toggle */}
-      <div className="px-3 pb-4">
-        <ThemeToggle theme={theme} onToggle={onThemeToggle} />
-      </div>
     </>
   )
 }
@@ -158,7 +128,9 @@ export default function Layout({ session }) {
   const [uploadStep, setUploadStep] = useState(null)
   const [refreshKey, setRefreshKey] = useState(0)
   const [profile, setProfile] = useState(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [theme, setTheme] = useState(() => localStorage.getItem('ss-theme') || 'classic')
+  const profileDefaultsApplied = useRef(false)
 
   // Apply theme class to <html>
   useEffect(() => {
@@ -170,10 +142,24 @@ export default function Layout({ session }) {
     }
   }, [theme])
 
+  // Apply per-user defaults from Supabase once on first profile load
+  useEffect(() => {
+    if (profile && !profileDefaultsApplied.current) {
+      profileDefaultsApplied.current = true
+      if (profile.default_page && NAV_ITEMS.some(i => i.id === profile.default_page)) {
+        setActivePage(profile.default_page)
+      }
+      if (profile.theme_preference) {
+        setTheme(profile.theme_preference)
+        localStorage.setItem('ss-theme', profile.theme_preference)
+      }
+    }
+  }, [profile])
+
   async function loadProfile() {
     const { data } = await supabase
       .from('profiles')
-      .select('player_label')
+      .select('player_label, display_name, theme_preference, default_page, avatar_color')
       .eq('id', session.user.id)
       .single()
     setProfile(data)
@@ -215,10 +201,14 @@ export default function Layout({ session }) {
     }
   }
 
-  function handleThemeToggle() {
-    const next = theme === 'classic' ? 'cosmic' : 'classic'
+  function applyTheme(next) {
     setTheme(next)
     localStorage.setItem('ss-theme', next)
+  }
+
+  function handleSaveSettings(updatedProfile) {
+    setProfile(updatedProfile)
+    applyTheme(updatedProfile.theme_preference || 'classic')
   }
 
   const currentLabel = NAV_ITEMS.find(i => i.id === activePage)?.label ?? 'Sunday Strikes'
@@ -235,8 +225,6 @@ export default function Layout({ session }) {
           activePage={activePage}
           onNavClick={handleNavClick}
           vsUnreadCount={vsUnreadCount}
-          theme={theme}
-          onThemeToggle={handleThemeToggle}
           onUpload={openUpload}
         />
       </aside>
@@ -299,9 +287,6 @@ export default function Layout({ session }) {
                 />
               ))}
             </nav>
-            <div className="px-3 pb-4">
-              <ThemeToggle theme={theme} onToggle={handleThemeToggle} />
-            </div>
           </aside>
         </div>
       )}
@@ -341,7 +326,11 @@ export default function Layout({ session }) {
 
         <div className="hidden md:block" />
 
-        <UserMenu session={session} />
+        <UserMenu
+          session={session}
+          profile={profile}
+          onOpenSettings={() => setSettingsOpen(true)}
+        />
       </header>
 
       {/* ── Mobile FAB ── */}
@@ -461,6 +450,17 @@ export default function Layout({ session }) {
           session={session}
           onClose={closeUpload}
           onSaved={handleGameSaved}
+        />
+      )}
+
+      {settingsOpen && (
+        <SettingsModal
+          session={session}
+          profile={profile}
+          theme={theme}
+          navItems={NAV_ITEMS}
+          onSave={handleSaveSettings}
+          onClose={() => setSettingsOpen(false)}
         />
       )}
     </div>
