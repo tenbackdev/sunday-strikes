@@ -78,7 +78,7 @@ function SplitRing() {
 
 // ── Bowling keypad ───────────────────────────────────────────────────────────
 
-function BowlingKeypad({ visible, isSplit, isSplitEligible, onKey, onBackspace, onToggleSplit, onDone }) {
+function BowlingKeypad({ visible, isSplit, onKey, onBackspace, onToggleSplit, onDone }) {
   const digits = ['1', '2', '3', '4', '5', '6', '7', '8', '9']
   const btn = 'flex items-center justify-center rounded-lg font-semibold select-none active:scale-[0.91] transition-transform'
 
@@ -137,23 +137,21 @@ function BowlingKeypad({ visible, isSplit, isSplitEligible, onKey, onBackspace, 
           >
             −
           </button>
-          {isSplitEligible ? (
-            <button
-              onMouseDown={e => { e.preventDefault(); onToggleSplit() }}
-              className={`${btn} h-11 text-xs`}
-              style={isSplit ? {
-                background: 'color-mix(in srgb, var(--loss) 15%, var(--elevated))',
-                color: 'var(--loss)',
-                border: '1.5px solid color-mix(in srgb, var(--loss) 40%, transparent)',
-              } : {
-                background: 'var(--elevated)',
-                color: 'var(--sub)',
-                border: '1px solid var(--border)',
-              }}
-            >
-              Split
-            </button>
-          ) : <div />}
+          <button
+            onMouseDown={e => { e.preventDefault(); onToggleSplit() }}
+            className={`${btn} h-11 text-xs`}
+            style={isSplit ? {
+              background: 'color-mix(in srgb, var(--loss) 15%, var(--elevated))',
+              color: 'var(--loss)',
+              border: '1.5px solid color-mix(in srgb, var(--loss) 40%, transparent)',
+            } : {
+              background: 'var(--elevated)',
+              color: 'var(--sub)',
+              border: '1px solid var(--border)',
+            }}
+          >
+            Split
+          </button>
           <button
             onMouseDown={e => { e.preventDefault(); onDone() }}
             className={`${btn} h-11 text-sm`}
@@ -384,33 +382,7 @@ export function EditableFrameGrid({ frames, onChange }) {
     })
   }
 
-  // Split eligibility for keypad button: mirrors toggleSplit rules
-  function isSplitEligible() {
-    if (!focusedBall) return false
-    const { fi, ballIdx } = focusedBall
-    const frame = frames[fi]
-    const isTenth = frame.frame === 10
-
-    // Fill ball (ball[2] in 10th) is never a split
-    if (isTenth && ballIdx === 2) return false
-
-    if (isTenth && frame.balls[0] === 'X') {
-      // Split applies to ball[1] in this case
-      if (ballIdx !== 1) return false
-      if (frame.split) return true  // allow unmark
-      const b2 = frame.balls[1]
-      return !!b2 && b2 !== 'X' && b2 !== '9'
-    }
-
-    // All other frames: split applies to ball[0]
-    if (ballIdx !== 0) return false
-    if (frame.split) return true  // allow unmark
-    const b1 = frame.balls[0]
-    return !!b1 && b1 !== 'X' && b1 !== '9'
-  }
-
   const isSplit = focusedBall ? (frames[focusedBall.fi]?.split ?? false) : false
-  const splitEligible = isSplitEligible()
 
   return (
     <div ref={containerRef}>
@@ -533,7 +505,6 @@ export function EditableFrameGrid({ frames, onChange }) {
       <BowlingKeypad
         visible={focusedBall !== null}
         isSplit={isSplit}
-        isSplitEligible={splitEligible}
         onKey={handleKeypadKey}
         onBackspace={handleKeypadBackspace}
         onToggleSplit={() => focusedBall && toggleSplit(focusedBall.fi)}

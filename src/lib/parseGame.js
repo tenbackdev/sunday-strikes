@@ -143,3 +143,20 @@ export function isConvertedSplit(frame) {
   if (frame.frame === 10) return b1 === 'X' ? b3 === '/' : b2 === '/'
   return b2 === '/'
 }
+
+export function normalizeFrames(frames) {
+  if (!frames?.length) return frames ?? []
+  return frames.map(frame => {
+    const isTenth = frame.frame === 10
+    let balls = Array.isArray(frame.balls) ? [...frame.balls] : []
+    balls = balls.map(b => (b === null || b === undefined || b === '') ? '-' : b)
+    if (!isTenth) {
+      if (balls[0] !== 'X' && balls.length < 2) balls.push('-')
+    } else {
+      while (balls.length < 2) balls.push('-')
+      if ((balls[0] === 'X' || balls[1] === '/') && balls.length < 3) balls.push('-')
+    }
+    if (balls.length === 0) balls = ['-', '-']
+    return { ...frame, balls }
+  })
+}

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { parseScorecard, parseBothScorecards } from '../lib/gemini'
-import { computeStats, computeScores } from '../lib/parseGame'
+import { computeStats, computeScores, normalizeFrames } from '../lib/parseGame'
 import { StatTable, FrameGrid, EditableFrameGrid } from './Scorecard'
 import { loadUploadPrefs, saveUploadPrefs, loadOpponentPref, saveOpponentPref } from '../lib/uploadPrefs'
 
@@ -137,7 +137,7 @@ function ScorecardStep({ title, playerLabel, setPlayerLabel, imageFile, setImage
         setError(result.error || `Could not find player "${playerLabel}" in the photo.`)
         setPhase('input'); return
       }
-      const scored = computeScores(result.frames)
+      const scored = computeScores(normalizeFrames(result.frames))
       const stats = computeStats(scored)
       setAiFrames(JSON.parse(JSON.stringify(scored)))
       setParsedData({ frames: scored, ...stats })
@@ -265,8 +265,8 @@ function CombinedScorecardStep({ myPlayerLabel, setMyPlayerLabel, myParsedData, 
       const oppRaw = players.find(p => p.label?.toUpperCase() === oppPlayerLabel.trim().toUpperCase())
       if (!myRaw?.found) { setError(`Could not find player "${myPlayerLabel}" in the photo.`); setPhase('input'); return }
       if (!oppRaw?.found) { setError(`Could not find player "${oppPlayerLabel}" in the photo.`); setPhase('input'); return }
-      const myScored = computeScores(myRaw.frames)
-      const oppScored = computeScores(oppRaw.frames)
+      const myScored = computeScores(normalizeFrames(myRaw.frames))
+      const oppScored = computeScores(normalizeFrames(oppRaw.frames))
       setMyAiFrames(JSON.parse(JSON.stringify(myScored)))
       setMyParsedData({ frames: myScored, ...computeStats(myScored) })
       setOppAiFrames(JSON.parse(JSON.stringify(oppScored)))

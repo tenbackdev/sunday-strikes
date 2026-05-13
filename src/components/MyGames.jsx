@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { parseScorecard } from '../lib/gemini'
-import { computeStats, computeScores, isConvertedSplit } from '../lib/parseGame'
+import { computeStats, computeScores, isConvertedSplit, normalizeFrames } from '../lib/parseGame'
 import { StatTable, FrameGrid, EditableFrameGrid } from './Scorecard'
 import { loadUploadPrefs, saveUploadPrefs } from '../lib/uploadPrefs'
 
@@ -551,7 +551,7 @@ export function UploadModal({ session, profile, onClose, onSaved }) {
         setPhase('input')
         return
       }
-      const scoredFrames = computeScores(result.frames)
+      const scoredFrames = computeScores(normalizeFrames(result.frames))
       const stats = computeStats(scoredFrames)
       setAiFrames(JSON.parse(JSON.stringify(scoredFrames)))
       setParsedData({ frames: scoredFrames, ...stats })
