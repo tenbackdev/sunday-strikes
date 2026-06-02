@@ -76,9 +76,44 @@ function SplitRing() {
   )
 }
 
+// ── Rack opener check ─────────────────────────────────────────────────────────
+// Ball 1 of every rack (fresh set of 10 pins) can never be a spare "/".
+// For frames 1-9 that's always ballIdx 0. In the 10th frame, ball 2 opens a
+// fresh rack when ball 1 was a strike, and ball 3 opens a fresh rack when
+// balls 1+2 were both strikes.
+function isRackOpener(balls, ballIdx, isTenth) {
+  if (ballIdx === 0) return true
+  if (!isTenth) return false
+  if (ballIdx === 1) return balls[0] === 'X'
+  if (ballIdx === 2) return balls[0] === 'X' && balls[1] === 'X'
+  return false
+}
+
+// Returns { maxDigit, allowX, allowSpare } for the focused ball.
+// Drives which keypad buttons are enabled.
+function ballMax(frames, fi, ballIdx) {
+  const B = frames[fi].balls
+  const num = v => v === '-' ? 0 : v === 'X' ? 10 : (parseInt(v) || 0)
+  const fresh = { maxDigit: 9, allowX: true,  allowSpare: false }
+  const empty = { maxDigit: 9, allowX: false, allowSpare: false }
+  const part  = a => ({ maxDigit: Math.min(9, 10 - num(a)), allowX: false, allowSpare: true })
+  if (fi !== 9) {
+    if (ballIdx === 0) return fresh
+    const a = B[0]
+    return (a == null || a === '' || a === 'X') ? empty : part(a)
+  }
+  const [b0, b1] = B
+  if (ballIdx === 0) return fresh
+  if (ballIdx === 1) return b0 === 'X' ? fresh : (b0 == null || b0 === '' ? empty : part(b0))
+  return (b1 === 'X' || b1 === '/') ? fresh : (b1 == null || b1 === '' ? empty : part(b1))
+}
+
 // ── Bowling keypad ───────────────────────────────────────────────────────────
 
-function BowlingKeypad({ visible, isSplit, onKey, onBackspace, onToggleSplit, onDone }) {
+function BowlingKeypad({
+  visible, isSplit, slashDisabled, xDisabled, maxDigit = 9,
+  frameNum, ballNum, onKey, onBackspace, onToggleSplit, onDone, onPrev, onNext,
+}) {
   const digits = ['1', '2', '3', '4', '5', '6', '7', '8', '9']
   const btn = 'flex items-center justify-center rounded-lg font-semibold select-none active:scale-[0.91] transition-transform'
 
@@ -86,47 +121,85 @@ function BowlingKeypad({ visible, isSplit, onKey, onBackspace, onToggleSplit, on
     <div
       className="overflow-hidden"
       style={{
-        maxHeight: visible ? '108px' : '0',
+        maxHeight: visible ? '196px' : '0',
         marginTop: visible ? '8px' : '0',
         opacity: visible ? 1 : 0,
         transition: 'max-height 210ms ease, opacity 160ms ease, margin-top 180ms ease',
       }}
     >
       <div className="space-y-1.5">
-        {/* Digit row */}
-        <div className="grid grid-cols-10 gap-1">
-          {digits.map(d => (
-            <button
-              key={d}
-              onMouseDown={e => { e.preventDefault(); onKey(d) }}
-              className={`${btn} h-10 text-sm`}
-              style={{ background: 'var(--elevated)', color: 'var(--text)', border: '1px solid var(--border)' }}
-            >
-              {d}
-            </button>
-          ))}
-          <button
-            onMouseDown={e => { e.preventDefault(); onBackspace() }}
-            className={`${btn} h-10 text-base`}
-            style={{ background: 'var(--elevated)', color: 'var(--sub)', border: '1px solid var(--border)' }}
-          >
-            ⌫
-          </button>
+        {/* Navigation header */}
+        {frameNum != null && (
+          <div className="flex items-center justify-between">
+            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 700, color: 'var(--sub)', letterSpacing: '0.1em' }}>
+              FRAME {frameNum} · BALL {ballNum}
+            </span>
+            <div className="flex gap-1">
+              <button
+                onMouseDown={e => { e.preventDefault(); onPrev?.() }}
+                className="flex items-center gap-1 rounded px-2 select-none active:scale-[0.94] transition-transform"
+                style={{ height: 24, fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 700, letterSpacing: '0.05em', background: 'var(--card)', border: '1px solid var(--border)' }}
+              >
+                <span style={{ color: 'var(--accent)' }}>◄</span>
+                <span style={{ color: 'var(--text)' }}>PREV</span>
+              </button>
+              <button
+                onMouseDown={e => { e.preventDefault(); onNext?.() }}
+                className="flex items-center gap-1 rounded px-2 select-none active:scale-[0.94] transition-transform"
+                style={{ height: 24, fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 700, letterSpacing: '0.05em', background: 'var(--card)', border: '1px solid var(--border)' }}
+              >
+                <span style={{ color: 'var(--text)' }}>NEXT</span>
+                <span style={{ color: 'var(--accent)' }}>►</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Digit row — 9 columns; digits above maxDigit are grayed */}
+        <div className="grid grid-cols-9 gap-1">
+          {digits.map(d => {
+            const off = parseInt(d) > maxDigit
+            return (
+              <button
+                key={d}
+                onMouseDown={e => { e.preventDefault(); if (!off) onKey(d) }}
+                className={`${btn} h-10 text-sm`}
+                style={{
+                  background: 'var(--elevated)',
+                  color: off ? 'var(--border)' : 'var(--text)',
+                  border: '1px solid var(--border)',
+                  cursor: off ? 'default' : 'pointer',
+                }}
+              >
+                {d}
+              </button>
+            )
+          })}
         </div>
 
-        {/* Special keys row */}
-        <div className="grid grid-cols-5 gap-1">
+        {/* Special keys row: X / − ⌫ */}
+        <div className="grid grid-cols-4 gap-1">
           <button
-            onMouseDown={e => { e.preventDefault(); onKey('X') }}
+            onMouseDown={e => { e.preventDefault(); if (!xDisabled) onKey('X') }}
             className={`${btn} h-11 text-base`}
-            style={{ background: 'color-mix(in srgb, var(--strike) 12%, var(--elevated))', color: 'var(--strike)', border: '1px solid color-mix(in srgb, var(--strike) 25%, transparent)' }}
+            style={{
+              background: xDisabled ? 'var(--elevated)' : 'color-mix(in srgb, var(--strike) 12%, var(--elevated))',
+              color: xDisabled ? 'var(--border)' : 'var(--strike)',
+              border: xDisabled ? '1px solid var(--border)' : '1px solid color-mix(in srgb, var(--strike) 25%, transparent)',
+              cursor: xDisabled ? 'default' : 'pointer',
+            }}
           >
             X
           </button>
           <button
-            onMouseDown={e => { e.preventDefault(); onKey('/') }}
+            onMouseDown={e => { e.preventDefault(); if (!slashDisabled) onKey('/') }}
             className={`${btn} h-11 text-base`}
-            style={{ background: 'color-mix(in srgb, var(--spare) 12%, var(--elevated))', color: 'var(--spare)', border: '1px solid color-mix(in srgb, var(--spare) 25%, transparent)' }}
+            style={{
+              background: slashDisabled ? 'var(--elevated)' : 'color-mix(in srgb, var(--spare) 12%, var(--elevated))',
+              color: slashDisabled ? 'var(--border)' : 'var(--spare)',
+              border: slashDisabled ? '1px solid var(--border)' : '1px solid color-mix(in srgb, var(--spare) 25%, transparent)',
+              cursor: slashDisabled ? 'default' : 'pointer',
+            }}
           >
             /
           </button>
@@ -138,26 +211,39 @@ function BowlingKeypad({ visible, isSplit, onKey, onBackspace, onToggleSplit, on
             −
           </button>
           <button
+            onMouseDown={e => { e.preventDefault(); onBackspace() }}
+            className={`${btn} h-11 text-base`}
+            style={{ background: 'var(--elevated)', color: 'var(--sub)', border: '1px solid var(--border)' }}
+          >
+            ⌫
+          </button>
+        </div>
+
+        {/* Action row: SPLIT / DONE */}
+        <div className="grid grid-cols-2 gap-1">
+          <button
             onMouseDown={e => { e.preventDefault(); onToggleSplit() }}
             className={`${btn} h-11 text-xs`}
             style={isSplit ? {
               background: 'color-mix(in srgb, var(--loss) 15%, var(--elevated))',
               color: 'var(--loss)',
               border: '1.5px solid color-mix(in srgb, var(--loss) 40%, transparent)',
+              letterSpacing: '0.08em',
             } : {
               background: 'var(--elevated)',
               color: 'var(--sub)',
               border: '1px solid var(--border)',
+              letterSpacing: '0.08em',
             }}
           >
-            Split
+            {isSplit ? '● SPLIT' : '○ SPLIT'}
           </button>
           <button
             onMouseDown={e => { e.preventDefault(); onDone() }}
             className={`${btn} h-11 text-sm`}
-            style={{ background: 'var(--accent)', color: 'var(--acc-text)' }}
+            style={{ background: 'var(--text)', color: 'var(--card)', letterSpacing: '0.06em' }}
           >
-            Done
+            DONE ►
           </button>
         </div>
       </div>
@@ -185,6 +271,75 @@ export function StatTable({ strikes, spares, opens, initialRun, frames }) {
       ))}
       {cols.map(c => (
         <div key={`v-${c.header}`} className="text-sm font-semibold leading-tight" style={{ color: 'var(--text)' }}>{c.value}</div>
+      ))}
+    </div>
+  )
+}
+
+// ── Mini scorecard grid (read-only, compact) ────────────────────────────────
+
+export function MiniGrid({ frames }) {
+  const faint = '1px solid color-mix(in srgb, var(--border) 55%, transparent)'
+  return (
+    <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden', background: 'var(--card)' }}>
+      {frames.map((fr, fi) => {
+        const isTenth = fr.frame === 10
+        const isStrike = !isTenth && fr.balls[0] === 'X'
+        const boxes = isTenth ? [0, 1, 2] : (isStrike ? [0] : [0, 1])
+        const hasSplit = !!fr.split
+        return (
+          <div key={fr.frame} style={{ flex: isTenth ? 1.55 : 1, borderRight: fi < frames.length - 1 ? faint : 'none', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ textAlign: 'center', fontFamily: "'JetBrains Mono', monospace", fontSize: 7.5, color: 'var(--sub)', padding: '2px 0', borderBottom: faint, background: 'var(--elevated)' }}>
+              {fr.frame}
+            </div>
+            <div style={{ display: 'flex', height: 22, borderBottom: faint }}>
+              {boxes.map((b, bi) => {
+                const val = fr.balls[b]
+                const ringed = hasSplit && b === 0 && !isStrike
+                return (
+                  <div key={b} style={{ flex: 1, display: 'grid', placeItems: 'center', fontSize: 11.5, fontWeight: 600, borderRight: bi < boxes.length - 1 ? faint : 'none' }}>
+                    {ringed ? (
+                      <span style={{ display: 'inline-grid', placeItems: 'center', width: 15, height: 15, borderRadius: '50%', border: '1.5px solid var(--loss)' }}>
+                        <BallMark value={val ?? ''} />
+                      </span>
+                    ) : (
+                      <BallMark value={val ?? ''} />
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+            <div style={{ textAlign: 'center', padding: '3px 0', fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, fontSize: 11, color: (fr._complete ?? true) ? 'var(--text)' : 'var(--sub)' }}>
+              {fr.runningScore ?? ''}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ── Stat strip: X / – # S S/ ────────────────────────────────────────────────
+
+export function StatStrip({ stats, compact = false }) {
+  const pad = compact ? '4px 0 5px' : '5px 0 6px'
+  const fs = compact ? 14 : 15
+  const faint = 'color-mix(in srgb, var(--border) 55%, transparent)'
+  const cells = [
+    { k: 'X',  v: stats.strikes ?? 0,                       c: 'var(--strike)' },
+    { k: '/',  v: stats.spares ?? 0,                        c: 'var(--spare)'  },
+    { k: '–',  v: stats.opens ?? 0,                         c: 'var(--sub)'    },
+    { k: '#',  v: stats.run ?? stats.initialRun ?? 0,       c: 'var(--text)'   },
+    { k: 'S',  v: stats.splits ?? 0,                        c: 'var(--text)'   },
+    { k: 'S/', v: stats.conv ?? 0,                          c: 'var(--win)'    },
+  ]
+  return (
+    <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 9, overflow: 'hidden', background: 'var(--card)' }}>
+      {cells.map((c, i) => (
+        <div key={c.k} style={{ flex: 1, padding: pad, textAlign: 'center', borderLeft: i ? `1px solid ${faint}` : 'none' }}>
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9.5, fontWeight: 700, color: c.c }}>{c.k}</div>
+          <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: fs, color: 'var(--text)', lineHeight: 1.05 }}>{c.v}</div>
+        </div>
       ))}
     </div>
   )
@@ -281,6 +436,8 @@ export function EditableFrameGrid({ frames, onChange }) {
     const frame = frames[fi]
     const isTenth = frame.frame === 10
     let balls = [...frame.balls]
+
+    if (val === '/' && isRackOpener(balls, ballIdx, isTenth)) return
 
     val = applyAutoSpare(balls, ballIdx, val)
 
@@ -382,7 +539,40 @@ export function EditableFrameGrid({ frames, onChange }) {
     })
   }
 
+  function focusBall(fi, ballIdx) {
+    requestAnimationFrame(() => {
+      const input = containerRef.current?.querySelector(`[data-ball-fi="${fi}"][data-ball-bidx="${ballIdx}"]:not([disabled])`)
+      input?.focus()
+    })
+  }
+
+  function handleKeypadPrev() {
+    if (!focusedBall) return
+    const { fi, ballIdx } = focusedBall
+    const inputs = Array.from(containerRef.current?.querySelectorAll('[data-ball-input]:not([disabled])') ?? [])
+    const currentEl = containerRef.current?.querySelector(`[data-ball-fi="${fi}"][data-ball-bidx="${ballIdx}"]:not([disabled])`)
+    const idx = currentEl ? inputs.indexOf(currentEl) : -1
+    if (idx > 0) inputs[idx - 1].focus()
+  }
+
+  function handleKeypadNext() {
+    if (!focusedBall) return
+    const { fi, ballIdx } = focusedBall
+    const inputs = Array.from(containerRef.current?.querySelectorAll('[data-ball-input]:not([disabled])') ?? [])
+    const currentEl = containerRef.current?.querySelector(`[data-ball-fi="${fi}"][data-ball-bidx="${ballIdx}"]:not([disabled])`)
+    const idx = currentEl ? inputs.indexOf(currentEl) : -1
+    if (idx >= 0 && idx < inputs.length - 1) inputs[idx + 1].focus()
+  }
+
   const isSplit = focusedBall ? (frames[focusedBall.fi]?.split ?? false) : false
+  const constraints = focusedBall
+    ? ballMax(frames, focusedBall.fi, focusedBall.ballIdx)
+    : { maxDigit: 9, allowX: true, allowSpare: false }
+  const slashDisabled = !constraints.allowSpare
+  const xDisabled     = !constraints.allowX
+  const maxDigit      = constraints.maxDigit
+  const frameNum      = focusedBall ? frames[focusedBall.fi].frame : null
+  const ballNum       = focusedBall ? focusedBall.ballIdx + 1 : null
 
   return (
     <div ref={containerRef}>
@@ -420,7 +610,7 @@ export function EditableFrameGrid({ frames, onChange }) {
                 <div className="flex py-0.5" style={{ borderBottom: borderStyle }}>
                   {isTenth ? (
                     <>
-                      <div className="flex-1 flex items-center justify-center relative" style={{ borderRight: borderStyle }}>
+                      <div className="flex-1 flex items-center justify-center relative" style={{ borderRight: borderStyle }} onClick={e => { e.stopPropagation(); focusBall(fi, 0) }}>
                         <EditableBallInput
                           value={frame.balls[0] ?? ''}
                           onChange={v => setBall(fi, 0, v)}
@@ -431,7 +621,7 @@ export function EditableFrameGrid({ frames, onChange }) {
                         />
                         {frame.split && splitBallIdx === 0 && <SplitRing />}
                       </div>
-                      <div className="flex-1 flex items-center justify-center relative" style={{ borderRight: borderStyle }}>
+                      <div className="flex-1 flex items-center justify-center relative" style={{ borderRight: borderStyle }} onClick={e => { e.stopPropagation(); focusBall(fi, 1) }}>
                         <EditableBallInput
                           value={frame.balls[1] ?? ''}
                           onChange={v => setBall(fi, 1, v)}
@@ -442,7 +632,7 @@ export function EditableFrameGrid({ frames, onChange }) {
                         />
                         {frame.split && splitBallIdx === 1 && <SplitRing />}
                       </div>
-                      <div className="flex-1 flex items-center justify-center">
+                      <div className="flex-1 flex items-center justify-center" onClick={e => { e.stopPropagation(); focusBall(fi, 2) }}>
                         <EditableBallInput
                           value={frame.balls[2] ?? ''}
                           onChange={v => setBall(fi, 2, v)}
@@ -455,7 +645,7 @@ export function EditableFrameGrid({ frames, onChange }) {
                       </div>
                     </>
                   ) : isStrike ? (
-                    <div className="flex-1 flex items-center justify-center">
+                    <div className="flex-1 flex items-center justify-center" onClick={e => { e.stopPropagation(); focusBall(fi, 0) }}>
                       <EditableBallInput
                         value="X"
                         onChange={v => setBall(fi, 0, v)}
@@ -467,7 +657,7 @@ export function EditableFrameGrid({ frames, onChange }) {
                     </div>
                   ) : (
                     <>
-                      <div className="flex-1 flex items-center justify-center relative" style={{ borderRight: borderStyle }}>
+                      <div className="flex-1 flex items-center justify-center relative" style={{ borderRight: borderStyle }} onClick={e => { e.stopPropagation(); focusBall(fi, 0) }}>
                         <EditableBallInput
                           value={frame.balls[0] ?? ''}
                           onChange={v => setBall(fi, 0, v)}
@@ -478,7 +668,7 @@ export function EditableFrameGrid({ frames, onChange }) {
                         />
                         {frame.split && <SplitRing />}
                       </div>
-                      <div className="flex-1 flex items-center justify-center">
+                      <div className="flex-1 flex items-center justify-center" onClick={e => { e.stopPropagation(); focusBall(fi, 1) }}>
                         <EditableBallInput
                           value={frame.balls[1] ?? ''}
                           onChange={v => setBall(fi, 1, v)}
@@ -505,10 +695,17 @@ export function EditableFrameGrid({ frames, onChange }) {
       <BowlingKeypad
         visible={focusedBall !== null}
         isSplit={isSplit}
+        slashDisabled={slashDisabled}
+        xDisabled={xDisabled}
+        maxDigit={maxDigit}
+        frameNum={frameNum}
+        ballNum={ballNum}
         onKey={handleKeypadKey}
         onBackspace={handleKeypadBackspace}
         onToggleSplit={() => focusedBall && toggleSplit(focusedBall.fi)}
         onDone={handleKeypadDone}
+        onPrev={handleKeypadPrev}
+        onNext={handleKeypadNext}
       />
     </div>
   )

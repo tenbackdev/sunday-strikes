@@ -130,7 +130,7 @@ export default function Layout({ session }) {
   const [profile, setProfile] = useState(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [theme, setTheme] = useState(() => localStorage.getItem('ss-theme') || 'classic')
-  const profileDefaultsApplied = useRef(false)
+  const [cardPreview, setCardPreview] = useState(() => localStorage.getItem('ss_card_preview') ?? 'frames')
 
   // Apply theme class to <html>
   useEffect(() => {
@@ -201,9 +201,14 @@ export default function Layout({ session }) {
     }
   }
 
-  function applyTheme(next) {
-    setTheme(next)
-    localStorage.setItem('ss-theme', next)
+  function handleThemeChange(value) {
+    setTheme(value)
+    localStorage.setItem('ss-theme', value)
+  }
+
+  function handleCardPreviewChange(value) {
+    setCardPreview(value)
+    localStorage.setItem('ss_card_preview', value)
   }
 
   function handleSaveSettings(updatedProfile) {
@@ -328,8 +333,10 @@ export default function Layout({ session }) {
 
         <UserMenu
           session={session}
-          profile={profile}
-          onOpenSettings={() => setSettingsOpen(true)}
+          theme={theme}
+          onThemeChange={handleThemeChange}
+          cardPreview={cardPreview}
+          onCardPreviewChange={handleCardPreviewChange}
         />
       </header>
 
@@ -352,7 +359,7 @@ export default function Layout({ session }) {
       <main className="pt-14 md:ml-64">
         <div className="mx-auto max-w-2xl px-4 py-6 md:px-6">
           {activePage === 'my-games' && (
-            <MyGames session={session} refreshKey={refreshKey} onOpenUpload={openUpload} />
+            <MyGames session={session} refreshKey={refreshKey} onOpenUpload={openUpload} cardPreview={cardPreview} />
           )}
           {activePage === 'find-friends' && <FindFriends session={session} />}
           {activePage === 'vs-matches' && <VSMatches session={session} />}

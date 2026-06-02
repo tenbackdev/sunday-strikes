@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { parseScorecard, parseBothScorecards } from '../lib/gemini'
 import { computeStats, computeScores, normalizeFrames } from '../lib/parseGame'
 import { StatTable, FrameGrid, EditableFrameGrid } from './Scorecard'
+import { avatarStyle } from '../lib/avatar'
 import { loadUploadPrefs, saveUploadPrefs, loadOpponentPref, saveOpponentPref } from '../lib/uploadPrefs'
 
 function defaultPlayedAt() {
@@ -471,7 +472,7 @@ function SetupStep({ friends, loadingFriends, selectedFriend, setSelectedFriend,
               >
                 <div
                   className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold"
-                  style={{ background: 'color-mix(in srgb, var(--accent) 15%, transparent)', color: 'var(--accent)' }}
+                  style={avatarStyle(f.avatar_color)}
                 >
                   {initials}
                 </div>
@@ -548,7 +549,7 @@ export default function VSSubmitModal({ session, onClose, onSaved }) {
     async function loadFriends() {
       const { data } = await supabase
         .from('friend_requests')
-        .select(`id, sender_id, receiver_id, sender:sender_id(id, display_name, email), receiver:receiver_id(id, display_name, email)`)
+        .select(`id, sender_id, receiver_id, sender:sender_id(id, display_name, email, avatar_color), receiver:receiver_id(id, display_name, email, avatar_color)`)
         .eq('status', 'accepted')
         .or(`sender_id.eq.${session.user.id},receiver_id.eq.${session.user.id}`)
       const list = (data || []).map(r => r.sender_id === session.user.id ? r.receiver : r.sender)

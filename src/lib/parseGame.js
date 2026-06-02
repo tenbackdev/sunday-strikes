@@ -44,6 +44,7 @@ export function computeScores(frames) {
 
   return frames.map(frame => {
     let frameScore = 0
+    let _complete = true
 
     if (frame.frame === 10) {
       const [b1, b2, b3] = frame.balls
@@ -59,17 +60,20 @@ export function computeScores(frames) {
       frameScore = r1 + r2 + r3
     } else if (frame.balls[0] === 'X') {
       frameScore = 10 + (rolls[rollIdx + 1] ?? 0) + (rolls[rollIdx + 2] ?? 0)
+      _complete = rolls.length > rollIdx + 2
       rollIdx += 1
     } else if (frame.balls[1] === '/') {
       frameScore = 10 + (rolls[rollIdx + 2] ?? 0)
+      _complete = rolls.length > rollIdx + 2
       rollIdx += 2
     } else {
       frameScore = pv(frame.balls[0]) + pv(frame.balls[1])
+      _complete = frame.balls[1] != null && frame.balls[1] !== ''
       rollIdx += frame.balls[1] != null ? 2 : 1
     }
 
     running += frameScore
-    return { ...frame, runningScore: running }
+    return { ...frame, runningScore: running, _complete }
   })
 }
 
@@ -134,7 +138,15 @@ export function computeStats(frames) {
     }
   }
 
-  return { strikes, spares, opens, initialRun }
+  let splits = 0, conv = 0
+  for (const frame of frames) {
+    if (frame.split) {
+      splits++
+      if (isConvertedSplit(frame)) conv++
+    }
+  }
+
+  return { strikes, spares, opens, initialRun, run: initialRun, splits, conv }
 }
 
 export function isConvertedSplit(frame) {
