@@ -128,6 +128,7 @@ export default function Layout({ session }) {
   const [uploadStep, setUploadStep] = useState(null)
   const [refreshKey, setRefreshKey] = useState(0)
   const [profile, setProfile] = useState(null)
+  const profileDefaultsApplied = useRef(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [theme, setTheme] = useState(() => localStorage.getItem('ss-theme') || 'classic')
   const [cardPreview, setCardPreview] = useState(() => localStorage.getItem('ss_card_preview') ?? 'frames')
