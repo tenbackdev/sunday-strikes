@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import MyGames, { UploadModal } from './MyGames'
 import FindFriends from './FindFriends'
 import VSMatches from './VSMatches'
 import VSSubmitModal from './VSSubmitModal'
 import UserMenu from './UserMenu'
+import SettingsModal from './SettingsModal'
 
 const NAV_ITEMS = [
   {
@@ -127,8 +128,9 @@ export default function Layout({ session }) {
   const [uploadStep, setUploadStep] = useState(null)
   const [refreshKey, setRefreshKey] = useState(0)
   const [profile, setProfile] = useState(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [theme, setTheme] = useState(() => localStorage.getItem('ss-theme') || 'classic')
-  const [cardPreview, setCardPreview] = useState(() => localStorage.getItem('ss_card_preview') ?? 'frames')
+  const profileDefaultsApplied = useRef(false)
 
   // Apply theme class to <html>
   useEffect(() => {
@@ -140,10 +142,24 @@ export default function Layout({ session }) {
     }
   }, [theme])
 
+  // Apply per-user defaults from Supabase once on first profile load
+  useEffect(() => {
+    if (profile && !profileDefaultsApplied.current) {
+      profileDefaultsApplied.current = true
+      if (profile.default_page && NAV_ITEMS.some(i => i.id === profile.default_page)) {
+        setActivePage(profile.default_page)
+      }
+      if (profile.theme_preference) {
+        setTheme(profile.theme_preference)
+        localStorage.setItem('ss-theme', profile.theme_preference)
+      }
+    }
+  }, [profile])
+
   async function loadProfile() {
     const { data } = await supabase
       .from('profiles')
-      .select('player_label')
+      .select('player_label, display_name, theme_preference, default_page, avatar_color')
       .eq('id', session.user.id)
       .single()
     setProfile(data)
@@ -185,14 +201,14 @@ export default function Layout({ session }) {
     }
   }
 
-  function handleThemeChange(value) {
-    setTheme(value)
-    localStorage.setItem('ss-theme', value)
+  function applyTheme(next) {
+    setTheme(next)
+    localStorage.setItem('ss-theme', next)
   }
 
-  function handleCardPreviewChange(value) {
-    setCardPreview(value)
-    localStorage.setItem('ss_card_preview', value)
+  function handleSaveSettings(updatedProfile) {
+    setProfile(updatedProfile)
+    applyTheme(updatedProfile.theme_preference || 'classic')
   }
 
   const currentLabel = NAV_ITEMS.find(i => i.id === activePage)?.label ?? 'Sunday Strikes'
@@ -312,10 +328,8 @@ export default function Layout({ session }) {
 
         <UserMenu
           session={session}
-          theme={theme}
-          onThemeChange={handleThemeChange}
-          cardPreview={cardPreview}
-          onCardPreviewChange={handleCardPreviewChange}
+          profile={profile}
+          onOpenSettings={() => setSettingsOpen(true)}
         />
       </header>
 
@@ -436,6 +450,17 @@ export default function Layout({ session }) {
           session={session}
           onClose={closeUpload}
           onSaved={handleGameSaved}
+        />
+      )}
+
+      {settingsOpen && (
+        <SettingsModal
+          session={session}
+          profile={profile}
+          theme={theme}
+          navItems={NAV_ITEMS}
+          onSave={handleSaveSettings}
+          onClose={() => setSettingsOpen(false)}
         />
       )}
     </div>
