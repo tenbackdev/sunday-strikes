@@ -129,7 +129,7 @@ h1, h2, h3, .font-display {
 }
 
 /* ─────────────────────────────────────────────
-   Scrollbar
+   Scrollbar 
 ───────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: var(--bg); }
