@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import { avatarStyle } from '../lib/avatar'
 
 function ProfileRow({ profile }) {
   if (!profile) return null
@@ -8,7 +9,7 @@ function ProfileRow({ profile }) {
     <div className="flex items-center gap-3">
       <div
         className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold"
-        style={{ background: 'color-mix(in srgb, var(--accent) 15%, transparent)', color: 'var(--accent)' }}
+        style={avatarStyle(profile.avatar_color)}
       >
         {label[0].toUpperCase()}
       </div>
@@ -115,7 +116,7 @@ export default function FindFriends({ session }) {
     setSearching(true)
     const { data } = await supabase
       .from('profiles')
-      .select('id, display_name, email')
+      .select('id, display_name, email, avatar_color')
       .neq('id', session.user.id)
       .or(`email.ilike.%${q}%,display_name.ilike.%${q}%`)
       .limit(10)

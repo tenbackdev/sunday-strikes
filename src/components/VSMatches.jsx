@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { FrameGrid } from './Scorecard'
 import { computeStats, isConvertedSplit } from '../lib/parseGame'
+import { avatarStyle } from '../lib/avatar'
 
 const TIME_FILTERS = [
   { key: 'all',  label: 'All Time' },
@@ -189,7 +190,7 @@ function OpponentCard({ stats, onFilter, isActive, statView, onStatViewChange })
       >
         <div
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold"
-          style={{ background: 'color-mix(in srgb, var(--accent) 15%, transparent)', color: 'var(--accent)' }}
+          style={avatarStyle(stats.profile?.avatar_color)}
         >
           {initials}
         </div>
@@ -303,7 +304,7 @@ export default function VSMatches({ session }) {
     const allGameIds = matchRows.flatMap(m => [m.submitter_game_id, m.opponent_game_id])
 
     const [profilesRes, gamesRes] = await Promise.all([
-      supabase.from('profiles').select('id, display_name, email').in('id', allUserIds),
+      supabase.from('profiles').select('id, display_name, email, avatar_color').in('id', allUserIds),
       supabase.from('games').select('id, user_id, total_score, frames').in('id', allGameIds),
     ])
 

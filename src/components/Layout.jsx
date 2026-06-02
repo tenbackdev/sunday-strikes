@@ -49,32 +49,6 @@ const NAV_ITEMS = [
   },
 ]
 
-function ThemeToggle({ theme, onToggle }) {
-  return (
-    <button
-      onClick={onToggle}
-      title={theme === 'cosmic' ? 'Switch to Classic Lanes' : 'Switch to Cosmic Bowling'}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        width: '100%',
-        padding: '8px 12px',
-        borderRadius: '8px',
-        border: '1px solid rgba(255,255,255,0.1)',
-        background: 'rgba(255,255,255,0.05)',
-        color: 'rgba(255,255,255,0.5)',
-        fontSize: '12px',
-        fontWeight: '500',
-        cursor: 'pointer',
-        transition: 'all 0.15s',
-      }}
-    >
-      <span style={{ fontSize: '16px' }}>{theme === 'cosmic' ? '☀' : '✦'}</span>
-      <span>{theme === 'cosmic' ? 'Classic Lanes' : 'Cosmic Bowling'}</span>
-    </button>
-  )
-}
 
 function NavItem({ item, isActive, onClick, vsUnreadCount }) {
   return (
@@ -101,7 +75,7 @@ function NavItem({ item, isActive, onClick, vsUnreadCount }) {
   )
 }
 
-function SidebarContent({ activePage, onNavClick, vsUnreadCount, theme, onThemeToggle, onUpload }) {
+function SidebarContent({ activePage, onNavClick, vsUnreadCount, onUpload }) {
   return (
     <>
       {/* Logo */}
@@ -142,11 +116,6 @@ function SidebarContent({ activePage, onNavClick, vsUnreadCount, theme, onThemeT
           />
         ))}
       </nav>
-
-      {/* Theme toggle */}
-      <div className="px-3 pb-4">
-        <ThemeToggle theme={theme} onToggle={onThemeToggle} />
-      </div>
     </>
   )
 }
@@ -159,6 +128,7 @@ export default function Layout({ session }) {
   const [refreshKey, setRefreshKey] = useState(0)
   const [profile, setProfile] = useState(null)
   const [theme, setTheme] = useState(() => localStorage.getItem('ss-theme') || 'classic')
+  const [cardPreview, setCardPreview] = useState(() => localStorage.getItem('ss_card_preview') ?? 'frames')
 
   // Apply theme class to <html>
   useEffect(() => {
@@ -215,10 +185,14 @@ export default function Layout({ session }) {
     }
   }
 
-  function handleThemeToggle() {
-    const next = theme === 'classic' ? 'cosmic' : 'classic'
-    setTheme(next)
-    localStorage.setItem('ss-theme', next)
+  function handleThemeChange(value) {
+    setTheme(value)
+    localStorage.setItem('ss-theme', value)
+  }
+
+  function handleCardPreviewChange(value) {
+    setCardPreview(value)
+    localStorage.setItem('ss_card_preview', value)
   }
 
   const currentLabel = NAV_ITEMS.find(i => i.id === activePage)?.label ?? 'Sunday Strikes'
@@ -235,8 +209,6 @@ export default function Layout({ session }) {
           activePage={activePage}
           onNavClick={handleNavClick}
           vsUnreadCount={vsUnreadCount}
-          theme={theme}
-          onThemeToggle={handleThemeToggle}
           onUpload={openUpload}
         />
       </aside>
@@ -299,9 +271,6 @@ export default function Layout({ session }) {
                 />
               ))}
             </nav>
-            <div className="px-3 pb-4">
-              <ThemeToggle theme={theme} onToggle={handleThemeToggle} />
-            </div>
           </aside>
         </div>
       )}
@@ -341,7 +310,13 @@ export default function Layout({ session }) {
 
         <div className="hidden md:block" />
 
-        <UserMenu session={session} />
+        <UserMenu
+          session={session}
+          theme={theme}
+          onThemeChange={handleThemeChange}
+          cardPreview={cardPreview}
+          onCardPreviewChange={handleCardPreviewChange}
+        />
       </header>
 
       {/* ── Mobile FAB ── */}
@@ -363,7 +338,7 @@ export default function Layout({ session }) {
       <main className="pt-14 md:ml-64">
         <div className="mx-auto max-w-2xl px-4 py-6 md:px-6">
           {activePage === 'my-games' && (
-            <MyGames session={session} refreshKey={refreshKey} onOpenUpload={openUpload} />
+            <MyGames session={session} refreshKey={refreshKey} onOpenUpload={openUpload} cardPreview={cardPreview} />
           )}
           {activePage === 'find-friends' && <FindFriends session={session} />}
           {activePage === 'vs-matches' && <VSMatches session={session} />}
