@@ -1,18 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
-
-const AVATAR_COLORS = [
-  { label: 'Red',      value: '#cc1507' },
-  { label: 'Blue',     value: '#1a60a8' },
-  { label: 'Green',    value: '#1a6b2e' },
-  { label: 'Gold',     value: '#b8882a' },
-  { label: 'Purple',   value: '#7c3aed' },
-  { label: 'Teal',     value: '#0d9488' },
-  { label: 'Orange',   value: '#ea580c' },
-  { label: 'Pink',     value: '#db2777' },
-  { label: 'Slate',    value: '#475569' },
-  { label: 'Charcoal', value: '#374151' },
-]
+import { AVATAR_COLORS } from '../lib/avatar'
 
 
 const THEME_OPTIONS = [
@@ -163,16 +151,16 @@ export default function SettingsModal({ session, profile, theme, navItems, onSav
               Avatar color
             </label>
             <div className="mb-5 flex flex-wrap gap-2.5">
-              {AVATAR_COLORS.map(c => (
+              {AVATAR_COLORS.map(color => (
                 <button
-                  key={c.value}
-                  onClick={() => setAvatarColor(avatarColor === c.value ? null : c.value)}
-                  title={c.label}
+                  key={color}
+                  onClick={() => setAvatarColor(avatarColor === color ? null : color)}
+                  title={color}
                   className="h-8 w-8 rounded-full transition-transform active:scale-90"
                   style={{
-                    background: c.value,
-                    outline: avatarColor === c.value
-                      ? `3px solid ${c.value}`
+                    background: color,
+                    outline: avatarColor === color
+                      ? `3px solid ${color}`
                       : '3px solid transparent',
                     outlineOffset: '2px',
                   }}

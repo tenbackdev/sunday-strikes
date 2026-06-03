@@ -89,13 +89,13 @@ const PAGE_OPTIONS = [
   { value: 'find-friends', label: 'Friends' },
 ]
 
-export default function UserMenu({ session, theme, onThemeChange, cardPreview, onCardPreviewChange, onProfileSave }) {
+export default function UserMenu({ session, theme, onThemeChange, cardPreview, onCardPreviewChange, onProfileSave, profileAvatarColor }) {
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState({ top: 0, right: 0 })
 
   const [displayName, setDisplayName] = useState('')
   const [playerLabel, setPlayerLabel] = useState('')
-  const [avatarColor, setAvatarColor] = useState(null)
+  const [avatarColor, setAvatarColor] = useState(profileAvatarColor ?? null)
   const [defaultPage, setDefaultPage] = useState('my-games')
   const [profileLoaded, setProfileLoaded] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -103,6 +103,11 @@ export default function UserMenu({ session, theme, onThemeChange, cardPreview, o
 
   const btnRef = useRef(null)
   const panelRef = useRef(null)
+
+  // Keep header avatar in sync when profile loads or SettingsModal saves
+  useEffect(() => {
+    if (!open) setAvatarColor(profileAvatarColor ?? null)
+  }, [profileAvatarColor])
 
   // Position panel flush to button's bottom-right
   useEffect(() => {

@@ -343,6 +343,7 @@ export default function Layout({ session }) {
           cardPreview={cardPreview}
           onCardPreviewChange={handleCardPreviewChange}
           onProfileSave={handleUserMenuSave}
+          profileAvatarColor={profile?.avatar_color ?? null}
         />
       </header>
 
