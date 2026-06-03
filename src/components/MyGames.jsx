@@ -902,7 +902,7 @@ export default function MyGames({ session, refreshKey = 0, onOpenUpload, cardPre
   useEffect(() => {
     const el = mainHeaderRef.current
     if (!el) return
-    const ro = new ResizeObserver(entries => setMainHeaderH(entries[0].contentRect.height))
+    const ro = new ResizeObserver(() => setMainHeaderH(mainHeaderRef.current?.offsetHeight ?? 0))
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
@@ -1280,7 +1280,7 @@ export default function MyGames({ session, refreshKey = 0, onOpenUpload, cardPre
   // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-0">
+    <div className="space-y-0" style={{ marginTop: -24 }}>
 
       {/* ── Sticky main header ── */}
       <div
@@ -1290,6 +1290,7 @@ export default function MyGames({ session, refreshKey = 0, onOpenUpload, cardPre
           top: FIXED_H,
           zIndex: 18,
           background: 'var(--bg)',
+          paddingTop: 8,
           paddingBottom: 8,
         }}
       >
