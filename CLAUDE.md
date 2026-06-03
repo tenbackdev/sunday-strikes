@@ -116,6 +116,10 @@ VITE_GEMINI_API_KEY=
 - **Spacing:** Use intentional, consistent spacing tokens — not random Tailwind steps.
 - **Depth:** Surfaces should have a layering system (base → elevated → floating).
 
+### Bowling Chart Rules
+- Score-based Y-axes (any chart showing bowling scores) always cap at **300** — the maximum possible score. Never use `'auto'` as the Y-axis upper bound for score data.
+- Score distribution histograms must give scores of exactly 300 their own dedicated bucket labeled `"300"`, separate from the 280–299 bucket.
+
 ### Hard Rules
 - Do not add sections, features, or content not in the reference
 - Do not "improve" a reference design — match it
