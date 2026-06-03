@@ -213,8 +213,12 @@ export default function Layout({ session }) {
   }
 
   function handleSaveSettings(updatedProfile) {
-    setProfile(updatedProfile)
-    applyTheme(updatedProfile.theme_preference || 'classic')
+    setProfile(prev => ({ ...prev, ...updatedProfile }))
+    handleThemeChange(updatedProfile.theme_preference || 'classic')
+  }
+
+  function handleUserMenuSave(updates) {
+    setProfile(prev => ({ ...prev, ...updates }))
   }
 
   const currentLabel = NAV_ITEMS.find(i => i.id === activePage)?.label ?? 'Sunday Strikes'
@@ -338,6 +342,7 @@ export default function Layout({ session }) {
           onThemeChange={handleThemeChange}
           cardPreview={cardPreview}
           onCardPreviewChange={handleCardPreviewChange}
+          onProfileSave={handleUserMenuSave}
         />
       </header>
 
