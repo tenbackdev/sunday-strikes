@@ -374,7 +374,7 @@ export default function Layout({ session }) {
 
       {/* ── Page content ── */}
       <main className="pt-14 md:ml-64">
-        <div className="mx-auto max-w-2xl px-4 py-6 md:px-6">
+        <div className="mx-auto max-w-2xl px-4 pt-6 pb-24 md:px-6 md:pb-6">
           {activePage === 'my-games' && (
             <MyGames session={session} refreshKey={refreshKey} onOpenUpload={openUpload} cardPreview={cardPreview} />
           )}
