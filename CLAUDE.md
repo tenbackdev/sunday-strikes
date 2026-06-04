@@ -69,6 +69,7 @@ Both major workflows use a **phase/step state machine** pattern — a single sta
 - Mobile: hamburger → slide-in sidebar overlay; FAB for quick game upload
 - Modals use a fixed overlay with backdrop blur
 - **Page root containers must cancel Layout padding.** Layout's content wrapper uses `py-6` (24px top padding). Every page component's root div must apply `style={{ marginTop: -24 }}` so that sticky headers land at exactly `top: FIXED_H` (56 px) and page-to-page navigation feels fixed. MyGames already does this; all new and existing pages must follow the same pattern.
+- **Mobile FAB clearance.** The content wrapper in `Layout.jsx` uses `pb-24 md:pb-6` so the mobile FAB (56px tall, 24px from the bottom = 80px total) never covers the last piece of content on any page. Do not reduce this bottom padding on mobile.
 
 ### Environment Variables
 
