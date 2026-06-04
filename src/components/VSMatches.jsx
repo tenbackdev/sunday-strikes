@@ -84,14 +84,14 @@ function resultStyle(r) {
   return { background: 'color-mix(in srgb, var(--sub) 12%, transparent)', color: 'var(--sub)' }
 }
 
-function StatCard({ label, value, sub }) {
+function StatCard({ label, value, sub, nowrap }) {
   return (
     <div
       className="rounded-xl px-4 py-3 text-center"
       style={{ background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}
     >
       <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', color: 'var(--sub)' }}>{label}</p>
-      <p className="mt-0.5" style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 30, letterSpacing: '-0.02em', lineHeight: 1.1, color: 'var(--text)' }}>{value}</p>
+      <p className="mt-0.5" style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: nowrap ? 'clamp(12px, 4vw, 28px)' : 30, letterSpacing: '-0.02em', lineHeight: 1.1, color: 'var(--text)', whiteSpace: nowrap ? 'nowrap' : undefined }}>{value}</p>
       {sub && <p className="text-[10px]" style={{ color: 'var(--sub)' }}>{sub}</p>}
     </div>
   )
@@ -469,7 +469,7 @@ export default function VSMatches({ session }) {
 
             {/* Overall stats */}
             <div className="grid grid-cols-2 gap-3">
-              <StatCard label="Record" value={recordStr} sub={`${winPct}% win rate`} />
+              <StatCard label="Record" value={recordStr} sub={`${winPct}% win rate`} nowrap />
               <StatCard label="Avg Score" value={avgMyScore || '—'} sub="in VS matches" />
               <StatCard label="Pin Diff" value={totalPinDiff > 0 ? `+${totalPinDiff}` : totalPinDiff}
                 sub={total > 0 ? `${totalPinDiff > 0 ? '+' : ''}${Math.round(totalPinDiff / total)} avg/game` : undefined} />
