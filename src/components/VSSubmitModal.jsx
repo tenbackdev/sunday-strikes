@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { parseScorecard, parseBothScorecards } from '../lib/gemini'
-import { computeStats, computeScores, normalizeFrames } from '../lib/parseGame'
-import { StatTable, FrameGrid, EditableFrameGrid } from './Scorecard'
+import { computeStats, computeScores } from '../lib/parseGame'
+import { sanitizeFrames } from '../lib/validateFrames'
+import { StatTable, FrameGrid, EditableFrameGrid, ParseWarningBanner } from './Scorecard'
 import { avatarStyle } from '../lib/avatar'
 import { loadUploadPrefs, saveUploadPrefs, loadOpponentPref, saveOpponentPref } from '../lib/uploadPrefs'
 
@@ -119,13 +120,14 @@ function ScorecardStep({ title, playerLabel, setPlayerLabel, imageFile, setImage
   const cameraRef = useRef(null)
   const galleryRef = useRef(null)
   const [previewUrl, setPreviewUrl] = useState(null)
+  const [parseWarnings, setParseWarnings] = useState([])
 
   function handleFileSelect(e) {
     const file = e.target.files[0]
     if (!file) return
     setImageFile(file)
     setPreviewUrl(URL.createObjectURL(file))
-    setError(null); setParsedData(null); setAiFrames(null); setPhase('input')
+    setError(null); setParsedData(null); setAiFrames(null); setParseWarnings([]); setPhase('input')
   }
 
   async function handleParse() {
@@ -138,8 +140,10 @@ function ScorecardStep({ title, playerLabel, setPlayerLabel, imageFile, setImage
         setError(result.error || `Could not find player "${playerLabel}" in the photo.`)
         setPhase('input'); return
       }
-      const scored = computeScores(normalizeFrames(result.frames))
+      const { frames: sanitized, warnings } = sanitizeFrames(result.frames)
+      const scored = computeScores(sanitized)
       const stats = computeStats(scored)
+      setParseWarnings(warnings)
       setAiFrames(JSON.parse(JSON.stringify(scored)))
       setParsedData({ frames: scored, ...stats })
       setPhase('review')
@@ -213,6 +217,7 @@ function ScorecardStep({ title, playerLabel, setPlayerLabel, imageFile, setImage
             </div>
             <StatTable strikes={parsedData.strikes} spares={parsedData.spares} opens={parsedData.opens} initialRun={parsedData.initialRun} frames={parsedData.frames} />
           </div>
+          <ParseWarningBanner warnings={parseWarnings} />
           <p className="mb-2 text-[10px]" style={{ color: 'var(--sub)' }}>Tap any ball to edit</p>
           <EditableFrameGrid frames={parsedData.frames} onChange={handleFramesChange} />
         </div>
@@ -247,13 +252,16 @@ function CombinedScorecardStep({ myPlayerLabel, setMyPlayerLabel, myParsedData, 
   const galleryRef = useRef(null)
   const [previewUrl, setPreviewUrl] = useState(null)
   const [imageFile, setImageFile] = useState(null)
+  const [myParseWarnings, setMyParseWarnings] = useState([])
+  const [oppParseWarnings, setOppParseWarnings] = useState([])
 
   function handleFileSelect(e) {
     const file = e.target.files[0]
     if (!file) return
     setImageFile(file)
     setPreviewUrl(URL.createObjectURL(file))
-    setError(null); setMyParsedData(null); setOppParsedData(null); setPhase('input')
+    setError(null); setMyParsedData(null); setOppParsedData(null)
+    setMyParseWarnings([]); setOppParseWarnings([]); setPhase('input')
   }
 
   async function handleParse() {
@@ -266,8 +274,12 @@ function CombinedScorecardStep({ myPlayerLabel, setMyPlayerLabel, myParsedData, 
       const oppRaw = players.find(p => p.label?.toUpperCase() === oppPlayerLabel.trim().toUpperCase())
       if (!myRaw?.found) { setError(`Could not find player "${myPlayerLabel}" in the photo.`); setPhase('input'); return }
       if (!oppRaw?.found) { setError(`Could not find player "${oppPlayerLabel}" in the photo.`); setPhase('input'); return }
-      const myScored = computeScores(normalizeFrames(myRaw.frames))
-      const oppScored = computeScores(normalizeFrames(oppRaw.frames))
+      const { frames: mySanitized, warnings: myWarn } = sanitizeFrames(myRaw.frames)
+      const { frames: oppSanitized, warnings: oppWarn } = sanitizeFrames(oppRaw.frames)
+      const myScored = computeScores(mySanitized)
+      const oppScored = computeScores(oppSanitized)
+      setMyParseWarnings(myWarn)
+      setOppParseWarnings(oppWarn)
       setMyAiFrames(JSON.parse(JSON.stringify(myScored)))
       setMyParsedData({ frames: myScored, ...computeStats(myScored) })
       setOppAiFrames(JSON.parse(JSON.stringify(oppScored)))
@@ -350,12 +362,14 @@ function CombinedScorecardStep({ myPlayerLabel, setMyPlayerLabel, myParsedData, 
               <span className="text-xs font-semibold" style={{ color: 'var(--text)' }}>You — {myParsedData.frames[9]?.runningScore ?? 0}</span>
               <span className="text-[10px]" style={{ color: 'var(--sub)' }}>Tap any ball to edit</span>
             </div>
+            <ParseWarningBanner warnings={myParseWarnings} />
             <EditableFrameGrid frames={myParsedData.frames} onChange={handleMyFramesChange} />
           </div>
           <div>
             <div className="mb-1.5 flex items-center justify-between rounded-lg px-3 py-1.5" style={{ background: 'var(--elevated)' }}>
               <span className="text-xs font-semibold" style={{ color: 'var(--text)' }}>Opponent — {oppParsedData.frames[9]?.runningScore ?? 0}</span>
             </div>
+            <ParseWarningBanner warnings={oppParseWarnings} />
             <EditableFrameGrid frames={oppParsedData.frames} onChange={handleOppFramesChange} />
           </div>
         </div>
@@ -594,6 +608,14 @@ export default function VSSubmitModal({ session, onClose, onSaved }) {
   }
 
   async function handleSave() {
+    if (myScore < 0 || myScore > 300) {
+      setSaveError('Your computed score is out of range (0–300). Check your frame entries.')
+      return
+    }
+    if (oppScore < 0 || oppScore > 300) {
+      setSaveError('Opponent computed score is out of range (0–300). Check their frame entries.')
+      return
+    }
     setSaving(true); setSaveError(null)
     const myFramesEdited = myAiFrames && JSON.stringify(myParsedData.frames) !== JSON.stringify(myAiFrames)
     const oppFramesEdited = oppAiFrames && JSON.stringify(oppParsedData.frames) !== JSON.stringify(oppAiFrames)

@@ -1,0 +1,637 @@
+import { useState, useEffect, useMemo } from 'react'
+import { supabase } from '../lib/supabase'
+import { computeStats } from '../lib/parseGame'
+import {
+  ComposedChart, BarChart,
+  Area, Line, Bar, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+} from 'recharts'
+
+const TIME_FILTERS = [
+  { key: 'all',  label: 'All Time' },
+  { key: 'year', label: 'This Year' },
+  { key: '3mo',  label: '3 Months' },
+  { key: '30d',  label: '30 Days' },
+]
+
+const STAT_TABS = [
+  { key: 'overview', label: 'Overview' },
+  { key: 'strikes',  label: 'Strikes' },
+  { key: 'spares',   label: 'Spares' },
+  { key: 'pins',     label: 'Pins' },
+]
+
+const AMBER = '#BE7C2A'
+const FIXED_H = 56
+
+// Fixed bucket definitions — always 12 buckets regardless of data
+const DIST_BUCKETS = [
+  { label: '< 100', test: s => s < 100, isPerfect: false },
+  ...Array.from({ length: 10 }, (_, i) => {
+    const lo = 100 + i * 20
+    return { label: String(lo), test: s => s >= lo && s < lo + 20, isPerfect: false }
+  }),
+  { label: '300', test: s => s === 300, isPerfect: true },
+]
+
+function getChartColors() {
+  const s = getComputedStyle(document.documentElement)
+  return {
+    accent: s.getPropertyValue('--accent').trim() || '#CE1B0E',
+    sub:    s.getPropertyValue('--sub').trim()    || '#9E8B6E',
+    border: s.getPropertyValue('--border').trim() || '#DECCA2',
+    text:   s.getPropertyValue('--text').trim()   || '#2C1810',
+  }
+}
+
+function fmtDate(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
+function fmtDateLong(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })
+}
+
+function RangeBandTooltip({ active, payload }) {
+  if (!active || !payload?.length) return null
+  const d = payload[0]?.payload
+  if (!d) return null
+  return (
+    <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', fontSize: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
+      <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>{fmtDateLong(d.date)}</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 3, fontFamily: "'JetBrains Mono', monospace", fontSize: 11 }}>
+        <span style={{ color: 'var(--sub)' }}>High <span style={{ color: 'var(--text)', fontWeight: 700 }}>{d.high}</span></span>
+        <span style={{ color: 'var(--sub)' }}>Avg  <span style={{ color: 'var(--accent)', fontWeight: 700 }}>{d.avg}</span></span>
+        <span style={{ color: 'var(--sub)' }}>Low  <span style={{ color: 'var(--text)', fontWeight: 700 }}>{d.low}</span></span>
+      </div>
+    </div>
+  )
+}
+
+function RollingTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null
+  const score   = payload.find(p => p.dataKey === 'score')?.value
+  const rolling = payload.find(p => p.dataKey === 'rolling')?.value
+  return (
+    <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', fontSize: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
+      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: 'var(--sub)', fontSize: 10, marginBottom: 4 }}>GAME {label}</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 3, fontFamily: "'JetBrains Mono', monospace", fontSize: 11 }}>
+        <span style={{ color: 'var(--sub)' }}>Score <span style={{ color: 'var(--text)', fontWeight: 700 }}>{score}</span></span>
+        <span style={{ color: 'var(--sub)' }}>10-game avg <span style={{ color: 'var(--accent)', fontWeight: 700 }}>{rolling}</span></span>
+      </div>
+    </div>
+  )
+}
+
+function DistributionTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null
+  const count = payload[0]?.value
+  return (
+    <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', fontSize: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
+      <div style={{ fontFamily: "'JetBrains Mono', monospace", color: 'var(--text)', fontWeight: 700 }}>{count} {count === 1 ? 'game' : 'games'}</div>
+      <div style={{ fontFamily: "'JetBrains Mono', monospace", color: 'var(--sub)', fontSize: 10 }}>
+        {label === '300' ? 'Perfect game' : label === '< 100' ? 'Under 100' : `${label}–${Number(label) + 19}`}
+      </div>
+    </div>
+  )
+}
+
+function CountTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null
+  const count = payload[0]?.value
+  return (
+    <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', fontSize: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
+      <div style={{ fontFamily: "'JetBrains Mono', monospace", color: 'var(--text)', fontWeight: 700 }}>{count} {count === 1 ? 'game' : 'games'}</div>
+      <div style={{ fontFamily: "'JetBrains Mono', monospace", color: 'var(--sub)', fontSize: 10 }}>{label} strikes</div>
+    </div>
+  )
+}
+
+function FirstBallTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null
+  const count = payload[0]?.value
+  return (
+    <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', fontSize: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
+      <div style={{ fontFamily: "'JetBrains Mono', monospace", color: 'var(--text)', fontWeight: 700 }}>{count} {count === 1 ? 'frame' : 'frames'}</div>
+      <div style={{ fontFamily: "'JetBrains Mono', monospace", color: 'var(--sub)', fontSize: 10 }}>{label} pins on first ball</div>
+    </div>
+  )
+}
+
+function ChartCard({ title, children }) {
+  return (
+    <div style={{ border: '1px solid var(--border)', borderRadius: 12, background: 'var(--card)', paddingTop: 14, paddingBottom: 10, overflow: 'hidden' }}>
+      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', color: 'var(--sub)', marginBottom: 10, paddingLeft: 16 }}>
+        {title}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+function RibbonStat({ label, value, amber }) {
+  return (
+    <div style={{ flex: 1, padding: '10px 0 11px', textAlign: 'center' }}>
+      <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 22, letterSpacing: '-0.02em', color: amber ? AMBER : 'var(--text)', lineHeight: 1 }}>
+        {value}
+      </div>
+      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8.5, fontWeight: 700, letterSpacing: '0.1em', color: 'var(--sub)', marginTop: 4 }}>{label}</div>
+    </div>
+  )
+}
+
+function Ribbon({ stats }) {
+  return (
+    <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', background: 'var(--card)', boxShadow: '0 1px 2px rgba(60,40,15,0.05)' }}>
+      {stats.map((s, i) => (
+        <div key={s.label} style={{ flex: 1, borderLeft: i ? '1px solid var(--border)' : 'none' }}>
+          <RibbonStat label={s.label} value={s.value} amber={s.amber} />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function EmptyState() {
+  return (
+    <div className="flex flex-col items-center justify-center rounded-2xl py-16 mt-6" style={{ border: '2px dashed var(--border)' }}>
+      <p className="text-sm font-medium" style={{ color: 'var(--sub)' }}>No games in this period</p>
+      <p className="mt-1 text-xs" style={{ color: 'color-mix(in srgb, var(--sub) 60%, transparent)' }}>Try a wider time range</p>
+    </div>
+  )
+}
+
+export default function Stats({ session, theme }) {
+  const [timeFilter, setTimeFilter] = useState(() => localStorage.getItem('ss_stats_time_filter') ?? localStorage.getItem('ss_trends_time_filter') ?? 'all')
+  const [statsTab,   setStatsTab]   = useState('overview')
+  const [games, setGames]           = useState([])
+  const [isLoading, setIsLoading]   = useState(true)
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const colors = useMemo(() => getChartColors(), [theme])
+
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      setIsLoading(true)
+      const now = new Date()
+      let q = supabase.from('games').select('*').eq('user_id', session.user.id).order('played_at', { ascending: false })
+      if (timeFilter === 'year') q = q.gte('played_at', new Date(now.getFullYear(), 0, 1).toISOString())
+      else if (timeFilter === '3mo') q = q.gte('played_at', new Date(now - 90 * 86400000).toISOString())
+      else if (timeFilter === '30d') q = q.gte('played_at', new Date(now - 30 * 86400000).toISOString())
+      const { data } = await q
+      if (!cancelled) {
+        setGames(data ?? [])
+        setIsLoading(false)
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [timeFilter, session.user.id])
+
+  function changeTimeFilter(key) {
+    setTimeFilter(key)
+    localStorage.setItem('ss_stats_time_filter', key)
+  }
+
+  // ── Overview derived data ─────────────────────────────────────────────────────
+
+  const overviewRibbon = useMemo(() => {
+    if (!games.length) return null
+    const scores = games.map(g => g.total_score ?? 0)
+    return [
+      { label: 'GAMES',   value: games.length },
+      { label: 'AVG',     value: Math.round(scores.reduce((s, v) => s + v, 0) / scores.length) },
+      { label: 'BEST',    value: Math.max(...scores), amber: Math.max(...scores) === 300 },
+      { label: 'STRIKES', value: games.reduce((s, g) => s + computeStats(g.frames ?? []).strikes, 0) },
+    ]
+  }, [games])
+
+  const byDay = useMemo(() => {
+    const map = {}
+    for (const g of games) {
+      const day = g.played_at.slice(0, 10)
+      if (!map[day]) map[day] = []
+      map[day].push(g.total_score ?? 0)
+    }
+    return Object.entries(map)
+      .map(([date, scores]) => {
+        const high = Math.max(...scores)
+        const low  = Math.min(...scores)
+        return { date, high, low, avg: Math.round(scores.reduce((a, b) => a + b, 0) / scores.length), bandWidth: high - low }
+      })
+      .sort((a, b) => a.date.localeCompare(b.date))
+  }, [games])
+
+  const rollingData = useMemo(() => {
+    const N = 10
+    const sorted = [...games].reverse()
+    return sorted.map((g, i) => {
+      const window = sorted.slice(Math.max(0, i - N + 1), i + 1)
+      return {
+        index:   i + 1,
+        score:   g.total_score ?? 0,
+        rolling: Math.round(window.reduce((s, x) => s + (x.total_score ?? 0), 0) / window.length),
+      }
+    })
+  }, [games])
+
+  // Always 12 fixed buckets — no gaps even if a range has zero games
+  const distribution = useMemo(() => {
+    if (!games.length) return DIST_BUCKETS.map(b => ({ label: b.label, count: 0, isPerfect: b.isPerfect, isMax: false }))
+    const scores = games.map(g => g.total_score ?? 0)
+    const result = DIST_BUCKETS.map(b => ({
+      label: b.label,
+      count: scores.filter(b.test).length,
+      isPerfect: b.isPerfect,
+    }))
+    const peak = Math.max(...result.map(r => r.count))
+    return result.map(r => ({ ...r, isMax: peak > 0 && r.count === peak }))
+  }, [games])
+
+  // ── Strikes derived data ──────────────────────────────────────────────────────
+
+  const strikesData = useMemo(() => {
+    if (!games.length) return null
+    const allStats = games.map(g => computeStats(g.frames ?? []))
+    const totalFrames = games.length * 10
+
+    // Consecutive strike sequences within each game
+    let turkeyCount = 0
+    let doubleCount = 0
+    let bestInitialRun = 0
+
+    for (const g of games) {
+      const frames = g.frames ?? []
+      const s = computeStats(frames)
+      if (s.initialRun > bestInitialRun) bestInitialRun = s.initialRun
+
+      // Count doubles and turkeys within each game frame sequence
+      let run = 0
+      for (const f of frames.slice(0, 9)) {
+        if (f[0] === 'X') { run++ } else { run = 0 }
+        if (run === 2) doubleCount++
+        if (run === 3) turkeyCount++
+      }
+    }
+
+    const totalStrikes = allStats.reduce((s, x) => s + x.strikes, 0)
+    const strikeRate = totalFrames > 0 ? Math.round((totalStrikes / totalFrames) * 100) : 0
+
+    // Strikes-per-game distribution (0–12 possible)
+    const strikeCounts = allStats.map(s => s.strikes)
+    const maxStrikes = 12
+    const strikeDist = Array.from({ length: maxStrikes + 1 }, (_, i) => ({
+      label: String(i),
+      count: strikeCounts.filter(c => c === i).length,
+    }))
+    const peakStrikeDist = Math.max(...strikeDist.map(d => d.count))
+
+    return {
+      ribbon: [
+        { label: 'STRIKE RATE', value: `${strikeRate}%` },
+        { label: 'AVG / GAME',  value: games.length ? (totalStrikes / games.length).toFixed(1) : '0' },
+        { label: 'TURKEYS',     value: turkeyCount },
+        { label: 'DOUBLES',     value: doubleCount },
+        { label: 'BEST RUN',    value: bestInitialRun },
+      ],
+      strikeDist: strikeDist.map(d => ({ ...d, isMax: peakStrikeDist > 0 && d.count === peakStrikeDist })),
+    }
+  }, [games])
+
+  // ── Spares derived data ───────────────────────────────────────────────────────
+
+  const sparesData = useMemo(() => {
+    if (!games.length) return null
+    const allStats = games.map(g => computeStats(g.frames ?? []))
+
+    const totalSpares    = allStats.reduce((s, x) => s + x.spares, 0)
+    const totalOpens     = allStats.reduce((s, x) => s + x.opens,  0)
+    const totalSplits    = allStats.reduce((s, x) => s + x.splits, 0)
+    // Spare opportunities = non-strike frames in frames 1–9, plus 10th-frame second ball if first wasn't a strike
+    // Approximation: opens + spares (each was an opportunity)
+    const spareOpps  = totalSpares + totalOpens
+    const convRate   = spareOpps > 0 ? Math.round((totalSpares / spareOpps) * 100) : 0
+
+    return {
+      ribbon: [
+        { label: 'CONV RATE', value: `${convRate}%` },
+        { label: 'AVG SPARES', value: games.length ? (totalSpares / games.length).toFixed(1) : '0' },
+        { label: 'OPEN FRAMES', value: games.length ? (totalOpens / games.length).toFixed(1) : '0' },
+        { label: 'SPLITS', value: totalSplits },
+      ],
+    }
+  }, [games])
+
+  // ── Pins derived data ─────────────────────────────────────────────────────────
+
+  const pinsData = useMemo(() => {
+    if (!games.length) return null
+
+    let totalFirstBallPins = 0
+    let totalFirstBalls = 0
+    const firstBallBuckets = { '0–5': 0, '6': 0, '7': 0, '8': 0, '9': 0, '10 (X)': 0 }
+
+    for (const g of games) {
+      const frames = g.frames ?? []
+      for (let i = 0; i < Math.min(frames.length, 9); i++) {
+        const f = frames[i]
+        const ball1 = f[0]
+        const pins = ball1 === 'X' ? 10 : ball1 === '-' ? 0 : parseInt(ball1, 10)
+        if (!isNaN(pins)) {
+          totalFirstBallPins += pins
+          totalFirstBalls++
+          if (pins === 10) firstBallBuckets['10 (X)']++
+          else if (pins === 9) firstBallBuckets['9']++
+          else if (pins === 8) firstBallBuckets['8']++
+          else if (pins === 7) firstBallBuckets['7']++
+          else if (pins === 6) firstBallBuckets['6']++
+          else firstBallBuckets['0–5']++
+        }
+      }
+    }
+
+    const totalPins  = games.reduce((s, g) => s + (g.total_score ?? 0), 0)
+    const firstBallAvg = totalFirstBalls > 0 ? (totalFirstBallPins / totalFirstBalls).toFixed(1) : '0'
+
+    const firstBallDist = Object.entries(firstBallBuckets).map(([label, count]) => ({ label, count }))
+    const peakFB = Math.max(...firstBallDist.map(d => d.count))
+
+    return {
+      ribbon: [
+        { label: 'TOTAL PINS', value: totalPins.toLocaleString() },
+        { label: 'AVG / GAME', value: games.length ? Math.round(totalPins / games.length) : 0 },
+        { label: '1ST BALL AVG', value: firstBallAvg },
+      ],
+      firstBallDist: firstBallDist.map(d => ({ ...d, isMax: peakFB > 0 && d.count === peakFB })),
+    }
+  }, [games])
+
+  const hasGames           = games.length > 0
+  const bandTickInterval   = byDay.length > 20 ? Math.ceil(byDay.length / 10) - 1 : 'preserveStartEnd'
+
+  return (
+    <div style={{ marginTop: -24 }}>
+      {/* ── Sticky filter header — single row ── */}
+      <div style={{ position: 'sticky', top: FIXED_H, zIndex: 18, background: 'var(--bg)', paddingTop: 8, paddingBottom: 12 }}>
+        <div className="flex items-center gap-2">
+          {/* Category tabs — left */}
+          <div className="flex gap-1 rounded-xl p-1" style={{ background: 'var(--elevated)', border: '1px solid var(--border)' }}>
+            {STAT_TABS.map(t => (
+              <button
+                key={t.key}
+                onClick={() => setStatsTab(t.key)}
+                className="rounded-lg px-3 py-1.5 text-xs font-medium"
+                style={statsTab === t.key ? {
+                  background: 'color-mix(in srgb, var(--accent) 15%, transparent)',
+                  color: 'var(--accent)',
+                  border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)',
+                } : { color: 'var(--sub)', border: '1px solid transparent' }}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Time filter — right */}
+          <div className="flex gap-1 rounded-xl p-1 ml-auto" style={{ background: 'var(--elevated)', border: '1px solid var(--border)' }}>
+            {TIME_FILTERS.map(f => (
+              <button
+                key={f.key}
+                onClick={() => changeTimeFilter(f.key)}
+                className="rounded-lg px-2 py-1 text-xs font-medium"
+                style={timeFilter === f.key ? {
+                  background: 'color-mix(in srgb, var(--accent) 15%, transparent)',
+                  color: 'var(--accent)',
+                  border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)',
+                } : { color: 'var(--sub)', border: '1px solid transparent' }}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Loading ── */}
+      {isLoading && (
+        <div className="flex justify-center py-16 text-sm" style={{ color: 'var(--sub)' }}>Loading…</div>
+      )}
+
+      {/* ── Overview tab ── */}
+      {!isLoading && statsTab === 'overview' && (
+        <>
+          {!hasGames && <EmptyState />}
+          {hasGames && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}>
+
+              {/* Ribbon */}
+              {overviewRibbon && (
+                <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', background: 'var(--card)', boxShadow: '0 1px 2px rgba(60,40,15,0.05)' }}>
+                  {overviewRibbon.map((r, i) => (
+                    <div key={r.label} style={{ flex: 1, padding: '10px 0 11px', textAlign: 'center', borderLeft: i ? '1px solid var(--border)' : 'none' }}>
+                      <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 22, letterSpacing: '-0.02em', color: r.amber ? AMBER : 'var(--text)', lineHeight: 1 }}>
+                        {r.value}
+                      </div>
+                      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8.5, fontWeight: 700, letterSpacing: '0.1em', color: 'var(--sub)', marginTop: 4 }}>{r.label}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Chart A — Score Range Band */}
+              <ChartCard title="SCORE RANGE — HIGH / AVG / LOW PER SESSION">
+                <ResponsiveContainer width="100%" height={260}>
+                  <ComposedChart data={byDay} margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={colors.border} strokeOpacity={0.6} vertical={false} />
+                    <XAxis
+                      dataKey="date"
+                      tickFormatter={fmtDate}
+                      interval={bandTickInterval}
+                      padding={{ left: 12, right: 12 }}
+                      tick={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fill: colors.sub }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      domain={[dataMin => Math.max(0, dataMin - 10), 300]}
+                      tick={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fill: colors.sub }}
+                      axisLine={false}
+                      tickLine={false}
+                      width={40}
+                    />
+                    <Tooltip content={<RangeBandTooltip />} />
+                    <Area type="monotone" dataKey="low"       stackId="band" fill="transparent"   fillOpacity={1} stroke="none" isAnimationActive={false} />
+                    <Area type="monotone" dataKey="bandWidth" stackId="band" fill={colors.accent} fillOpacity={0.14} stroke="none" isAnimationActive={false} />
+                    <Line type="monotone" dataKey="high" stroke={colors.sub} strokeWidth={1}   strokeDasharray="4 2" dot={false} isAnimationActive={false} />
+                    <Line type="monotone" dataKey="low"  stroke={colors.sub} strokeWidth={1}   strokeDasharray="4 2" dot={false} isAnimationActive={false} />
+                    <Line type="monotone" dataKey="avg"  stroke={colors.accent} strokeWidth={2.5} dot={byDay.length === 1 ? { fill: colors.accent, r: 4, strokeWidth: 0 } : false} activeDot={{ r: 4, fill: colors.accent, strokeWidth: 0 }} isAnimationActive={false} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </ChartCard>
+
+              {/* Charts B + C — side by side on sm+, stacked on mobile */}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+
+                {/* Chart B — Rolling 10-Game Average */}
+                <ChartCard title="ROLLING 10-GAME AVERAGE">
+                  <ResponsiveContainer width="100%" height={200}>
+                    <ComposedChart data={rollingData} margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={colors.border} strokeOpacity={0.6} vertical={false} />
+                      <XAxis
+                        dataKey="index"
+                        padding={{ left: 12, right: 12 }}
+                        tick={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fill: colors.sub }}
+                        axisLine={false}
+                        tickLine={false}
+                        interval="preserveStartEnd"
+                      />
+                      <YAxis
+                        domain={[dataMin => Math.max(0, dataMin - 10), 300]}
+                        tick={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fill: colors.sub }}
+                        axisLine={false}
+                        tickLine={false}
+                        width={40}
+                      />
+                      <Tooltip content={<RollingTooltip />} />
+                      <Line type="monotone" dataKey="score"   stroke="none" dot={{ fill: colors.sub, r: 2.5, strokeWidth: 0, fillOpacity: 0.4 }} activeDot={false} isAnimationActive={false} />
+                      <Line type="monotone" dataKey="rolling" stroke={colors.accent} strokeWidth={2} dot={false} activeDot={{ r: 4, fill: colors.accent, strokeWidth: 0 }} isAnimationActive={false} />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </ChartCard>
+
+                {/* Chart C — Score Distribution */}
+                <ChartCard title="SCORE DISTRIBUTION">
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={distribution} margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={colors.border} strokeOpacity={0.6} vertical={false} />
+                      <XAxis
+                        dataKey="label"
+                        interval={0}
+                        tick={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, fill: colors.sub }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        allowDecimals={false}
+                        tick={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fill: colors.sub }}
+                        axisLine={false}
+                        tickLine={false}
+                        width={30}
+                      />
+                      <Tooltip content={<DistributionTooltip />} />
+                      <Bar dataKey="count" radius={[3, 3, 0, 0]} isAnimationActive={false}>
+                        {distribution.map((entry, i) => (
+                          <Cell key={i} fill={colors.accent} fillOpacity={entry.isMax ? 1 : 0.35} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </ChartCard>
+
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ── Strikes tab ── */}
+      {!isLoading && statsTab === 'strikes' && (
+        <>
+          {!hasGames && <EmptyState />}
+          {hasGames && strikesData && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}>
+
+              <Ribbon stats={strikesData.ribbon} />
+
+              <ChartCard title="STRIKES PER GAME">
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={strikesData.strikeDist} margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={colors.border} strokeOpacity={0.6} vertical={false} />
+                    <XAxis
+                      dataKey="label"
+                      interval={0}
+                      tick={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fill: colors.sub }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      allowDecimals={false}
+                      tick={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fill: colors.sub }}
+                      axisLine={false}
+                      tickLine={false}
+                      width={30}
+                    />
+                    <Tooltip content={<CountTooltip />} />
+                    <Bar dataKey="count" radius={[3, 3, 0, 0]} isAnimationActive={false}>
+                      {strikesData.strikeDist.map((entry, i) => (
+                        <Cell key={i} fill={colors.accent} fillOpacity={entry.isMax ? 1 : 0.35} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartCard>
+
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ── Spares tab ── */}
+      {!isLoading && statsTab === 'spares' && (
+        <>
+          {!hasGames && <EmptyState />}
+          {hasGames && sparesData && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}>
+              <Ribbon stats={sparesData.ribbon} />
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ── Pins tab ── */}
+      {!isLoading && statsTab === 'pins' && (
+        <>
+          {!hasGames && <EmptyState />}
+          {hasGames && pinsData && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}>
+
+              <Ribbon stats={pinsData.ribbon} />
+
+              <ChartCard title="FIRST BALL PIN COUNT">
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={pinsData.firstBallDist} margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={colors.border} strokeOpacity={0.6} vertical={false} />
+                    <XAxis
+                      dataKey="label"
+                      interval={0}
+                      tick={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, fill: colors.sub }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      allowDecimals={false}
+                      tick={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fill: colors.sub }}
+                      axisLine={false}
+                      tickLine={false}
+                      width={30}
+                    />
+                    <Tooltip content={<FirstBallTooltip />} />
+                    <Bar dataKey="count" radius={[3, 3, 0, 0]} isAnimationActive={false}>
+                      {pinsData.firstBallDist.map((entry, i) => (
+                        <Cell key={i} fill={colors.accent} fillOpacity={entry.isMax ? 1 : 0.35} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartCard>
+
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}

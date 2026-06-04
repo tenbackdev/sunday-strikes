@@ -4,6 +4,8 @@ import { FrameGrid } from './Scorecard'
 import { computeStats, isConvertedSplit } from '../lib/parseGame'
 import { avatarStyle } from '../lib/avatar'
 
+const FIXED_H = 56
+
 const TIME_FILTERS = [
   { key: 'all',  label: 'All Time' },
   { key: 'year', label: 'This Year' },
@@ -58,16 +60,16 @@ function VSDaySummary({ matches, opponentName }) {
         <thead>
           <tr>
             <th className="text-left font-normal pb-1 w-20" style={{ color: 'var(--sub)' }} />
-            <th className="text-center font-semibold pb-1" style={{ color: 'var(--text)' }}>You</th>
-            {theirs && <th className="text-center font-semibold pb-1" style={{ color: 'var(--text)' }}>{opponentName}</th>}
+            <th className="text-center pb-1" style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 12, color: 'var(--text)' }}>You</th>
+            {theirs && <th className="text-center pb-1" style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 12, color: 'var(--text)' }}>{opponentName}</th>}
           </tr>
         </thead>
         <tbody>
           {statRows.map(([label, myVal, theirVal]) => (
             <tr key={label}>
               <td className="py-0.5" style={{ color: 'var(--sub)' }}>{label}</td>
-              <td className="text-center font-semibold py-0.5" style={{ color: 'var(--text)' }}>{myVal}</td>
-              {theirs && <td className="text-center font-semibold py-0.5" style={{ color: 'var(--sub)' }}>{theirVal}</td>}
+              <td className="text-center py-0.5" style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, color: 'var(--text)' }}>{myVal}</td>
+              {theirs && <td className="text-center py-0.5" style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, color: 'var(--sub)' }}>{theirVal}</td>}
             </tr>
           ))}
         </tbody>
@@ -88,8 +90,8 @@ function StatCard({ label, value, sub }) {
       className="rounded-xl px-4 py-3 text-center"
       style={{ background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}
     >
-      <p className="text-xs font-medium" style={{ color: 'var(--sub)' }}>{label}</p>
-      <p className="mt-0.5 font-display text-3xl" style={{ color: 'var(--text)' }}>{value}</p>
+      <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', color: 'var(--sub)' }}>{label}</p>
+      <p className="mt-0.5" style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 30, letterSpacing: '-0.02em', lineHeight: 1.1, color: 'var(--text)' }}>{value}</p>
       {sub && <p className="text-[10px]" style={{ color: 'var(--sub)' }}>{sub}</p>}
     </div>
   )
@@ -110,15 +112,15 @@ function MatchRow({ match }) {
         onClick={() => setExpanded(e => !e)}
         className="flex w-full items-center gap-3 px-4 py-3 text-left"
       >
-        <span className="shrink-0 rounded-full px-2 py-0.5 text-xs font-bold" style={resultStyle(match.result)}>
+        <span className="shrink-0 rounded-lg px-2 py-0.5 text-xs font-bold" style={resultStyle(match.result)}>
           {match.result}
         </span>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
+          <p style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 15, letterSpacing: '-0.01em', color: 'var(--text)' }}>
             <span style={{ color: match.result === 'W' ? 'var(--win)' : match.result === 'L' ? 'var(--loss)' : 'var(--text)' }}>
               {match.myGame?.total_score ?? '—'}
             </span>
-            <span className="mx-1.5" style={{ color: 'var(--border)' }}>vs</span>
+            <span className="mx-1.5" style={{ color: 'var(--border)', fontWeight: 400 }}>vs</span>
             <span style={{ color: 'var(--sub)' }}>{match.theirGame?.total_score ?? '—'}</span>
           </p>
           <p className="text-xs" style={{ color: 'var(--sub)' }}>{oppName} · {dateStr}</p>
@@ -177,7 +179,7 @@ function OpponentCard({ stats, onFilter, isActive, statView, onStatViewChange })
     <div
       className="w-full rounded-xl px-4 py-3 transition-colors"
       style={{
-        border: `1px solid ${isActive ? 'var(--accent)' : 'var(--border)'}`,
+        border: `1px solid ${isActive ? 'var(--accent)' : 'color-mix(in srgb, var(--accent) 30%, var(--border))'}`,
         background: isActive ? 'color-mix(in srgb, var(--accent) 6%, transparent)' : 'var(--card)',
         boxShadow: 'var(--shadow-card)',
       }}
@@ -195,7 +197,7 @@ function OpponentCard({ stats, onFilter, isActive, statView, onStatViewChange })
           {initials}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold truncate" style={{ color: 'var(--text)' }}>{name}</p>
+          <p className="truncate" style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>{name}</p>
           <p className="text-xs" style={{ color: 'var(--sub)' }}>
             {stats.w}W-{stats.l}L{stats.t > 0 ? `-${stats.t}T` : ''} · {winPct}% win
           </p>
@@ -394,142 +396,141 @@ export default function VSMatches({ session }) {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="font-display text-3xl" style={{ color: 'var(--text)' }}>VS Matches</h2>
-        <p className="mt-1 text-sm" style={{ color: 'var(--sub)' }}>
-          {matches.length === 0 ? 'No VS matches yet' : `${matches.length} match${matches.length !== 1 ? 'es' : ''} total`}
-        </p>
+    <div className="space-y-0" style={{ marginTop: -24 }}>
+
+      {/* Sticky filter header */}
+      <div style={{ position: 'sticky', top: FIXED_H, zIndex: 18, background: 'var(--bg)', paddingTop: 8, paddingBottom: 8 }}>
+        <div className="flex gap-1 rounded-xl p-1" style={{ background: 'var(--elevated)', border: '1px solid var(--border)' }}>
+          {TIME_FILTERS.map(f => (
+            <button
+              key={f.key}
+              onClick={() => { setTimeFilter(f.key); setOpponentFilter(null) }}
+              className="flex-1 rounded-lg py-1.5 text-xs font-medium transition-all"
+              style={timeFilter === f.key ? {
+                background: 'var(--accent)',
+                color: 'var(--acc-text)',
+                boxShadow: '0 1px 3px color-mix(in srgb, var(--accent) 35%, transparent)',
+              } : { color: 'var(--sub)' }}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {matches.length === 0 ? (
-        <div
-          className="flex flex-col items-center justify-center rounded-2xl py-16"
-          style={{ border: '2px dashed var(--border)' }}
-        >
-          <p className="text-sm font-medium" style={{ color: 'var(--sub)' }}>No VS matches yet</p>
-          <p className="mt-1 text-xs" style={{ color: 'color-mix(in srgb, var(--sub) 60%, transparent)' }}>Submit a VS match from My Games to get started</p>
-        </div>
-      ) : (
-        <>
-          {/* Time filter */}
-          <div className="flex gap-1 rounded-xl p-1" style={{ background: 'var(--elevated)', border: '1px solid var(--border)' }}>
-            {TIME_FILTERS.map(f => (
-              <button
-                key={f.key}
-                onClick={() => { setTimeFilter(f.key); setOpponentFilter(null) }}
-                className="flex-1 rounded-lg py-1.5 text-xs font-medium transition-all"
-                style={timeFilter === f.key ? {
-                  background: 'color-mix(in srgb, var(--accent) 15%, transparent)',
-                  color: 'var(--accent)',
-                  border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)',
-                } : { color: 'var(--sub)' }}
-              >
-                {f.label}
-              </button>
-            ))}
+      {/* Body */}
+      <div className="space-y-6 pt-2">
+        {matches.length === 0 ? (
+          <div
+            className="flex flex-col items-center justify-center rounded-2xl py-16"
+            style={{ border: '2px dashed var(--border)' }}
+          >
+            <p className="text-sm font-medium" style={{ color: 'var(--sub)' }}>No VS matches yet</p>
+            <p className="mt-1 text-xs" style={{ color: 'color-mix(in srgb, var(--sub) 60%, transparent)' }}>Submit a VS match from My Games to get started</p>
           </div>
-
-          {/* Opponent filter pills */}
-          {opponentStats.length > 1 && (
-            <div className="flex gap-2 overflow-x-auto pb-0.5 -mx-1 px-1">
-              <button
-                onClick={() => setOpponentFilter(null)}
-                className="shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-all"
-                style={!opponentFilter ? { background: 'var(--accent)', color: 'var(--acc-text)' } : {
-                  background: 'var(--elevated)', color: 'var(--sub)', border: '1px solid var(--border)',
-                }}
-              >
-                All
-              </button>
-              {opponentStats.map(s => {
-                const name = s.profile?.display_name || s.profile?.email || 'Opponent'
-                const isActive = opponentFilter === s.profile?.id
-                return (
-                  <button
-                    key={s.profile?.id}
-                    onClick={() => setOpponentFilter(prev => prev === s.profile?.id ? null : s.profile?.id)}
-                    className="shrink-0 flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-all"
-                    style={isActive ? { background: 'var(--accent)', color: 'var(--acc-text)' } : {
-                      background: 'var(--elevated)', color: 'var(--sub)', border: '1px solid var(--border)',
-                    }}
-                  >
-                    <span
-                      className="inline-flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold"
-                      style={isActive ? { background: 'rgba(255,255,255,0.2)' } : { background: 'color-mix(in srgb, var(--sub) 20%, transparent)' }}
+        ) : (
+          <>
+            {/* Opponent filter pills */}
+            {opponentStats.length > 1 && (
+              <div className="flex gap-2 overflow-x-auto pb-0.5 -mx-1 px-1">
+                <button
+                  onClick={() => setOpponentFilter(null)}
+                  className="shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-all"
+                  style={!opponentFilter ? { background: 'var(--accent)', color: 'var(--acc-text)' } : {
+                    background: 'var(--elevated)', color: 'var(--sub)', border: '1px solid var(--border)',
+                  }}
+                >
+                  All
+                </button>
+                {opponentStats.map(s => {
+                  const name = s.profile?.display_name || s.profile?.email || 'Opponent'
+                  const isActive = opponentFilter === s.profile?.id
+                  return (
+                    <button
+                      key={s.profile?.id}
+                      onClick={() => setOpponentFilter(prev => prev === s.profile?.id ? null : s.profile?.id)}
+                      className="shrink-0 flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-all"
+                      style={isActive ? { background: 'var(--accent)', color: 'var(--acc-text)' } : {
+                        background: 'var(--elevated)', color: 'var(--sub)', border: '1px solid var(--border)',
+                      }}
                     >
-                      {name.slice(0, 1).toUpperCase()}
-                    </span>
-                    {name.split(' ')[0]}
-                  </button>
-                )
-              })}
-            </div>
-          )}
-
-          {/* Overall stats */}
-          <div className="grid grid-cols-2 gap-3">
-            <StatCard label="Record" value={recordStr} sub={`${winPct}% win rate`} />
-            <StatCard label="Avg Score" value={avgMyScore || '—'} sub="in VS matches" />
-            <StatCard label="Pin Diff" value={totalPinDiff > 0 ? `+${totalPinDiff}` : totalPinDiff}
-              sub={total > 0 ? `${totalPinDiff > 0 ? '+' : ''}${Math.round(totalPinDiff / total)} avg/game` : undefined} />
-            <StatCard label="Matches" value={total}
-              sub={timeFilter === 'all' ? 'all time' : TIME_FILTERS.find(f => f.key === timeFilter)?.label} />
-          </div>
-
-          {/* Head-to-head breakdown */}
-          {opponentStats.length > 0 && (
-            <div>
-              <div className="mb-2 flex items-center justify-between">
-                <h3 className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Head-to-Head</h3>
-                {opponentFilter && (
-                  <button onClick={() => setOpponentFilter(null)} className="text-xs font-medium" style={{ color: 'var(--accent)' }}>
-                    Clear filter
-                  </button>
-                )}
-              </div>
-              <div className="space-y-2">
-                {opponentStats.map(s => (
-                  <OpponentCard
-                    key={s.profile?.id}
-                    stats={s}
-                    isActive={opponentFilter === s.profile?.id}
-                    onFilter={() => setOpponentFilter(prev => prev === s.profile?.id ? null : s.profile?.id)}
-                    statView={getCardView(s.profile?.id)}
-                    onStatViewChange={mode => setCardStatView(prev => ({ ...prev, [s.profile?.id]: mode }))}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Match history */}
-          <div>
-            <h3 className="mb-2 text-sm font-semibold" style={{ color: 'var(--text)' }}>
-              Match History
-              {opponentFilter && (
-                <span className="ml-1 font-normal" style={{ color: 'var(--sub)' }}>
-                  · vs {activeOpponentName}
-                </span>
-              )}
-            </h3>
-            {filtered.length === 0 ? (
-              <p className="py-8 text-center text-sm" style={{ color: 'var(--sub)' }}>No matches in this range</p>
-            ) : (
-              <div className="space-y-4">
-                {matchDateGroups.map(({ date, matches: dayMatches }) => (
-                  <div key={date.toDateString()} className="space-y-2">
-                    <VSDaySummary matches={dayMatches} opponentName={activeOpponentName} />
-                    {dayMatches.map(m => (
-                      <MatchRow key={m.id} match={m} />
-                    ))}
-                  </div>
-                ))}
+                      <span
+                        className="inline-flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold"
+                        style={isActive ? { background: 'rgba(255,255,255,0.2)' } : { background: 'color-mix(in srgb, var(--sub) 20%, transparent)' }}
+                      >
+                        {name.slice(0, 1).toUpperCase()}
+                      </span>
+                      {name.split(' ')[0]}
+                    </button>
+                  )
+                })}
               </div>
             )}
-          </div>
-        </>
-      )}
+
+            {/* Overall stats */}
+            <div className="grid grid-cols-2 gap-3">
+              <StatCard label="Record" value={recordStr} sub={`${winPct}% win rate`} />
+              <StatCard label="Avg Score" value={avgMyScore || '—'} sub="in VS matches" />
+              <StatCard label="Pin Diff" value={totalPinDiff > 0 ? `+${totalPinDiff}` : totalPinDiff}
+                sub={total > 0 ? `${totalPinDiff > 0 ? '+' : ''}${Math.round(totalPinDiff / total)} avg/game` : undefined} />
+              <StatCard label="Matches" value={total}
+                sub={timeFilter === 'all' ? 'all time' : TIME_FILTERS.find(f => f.key === timeFilter)?.label} />
+            </div>
+
+            {/* Head-to-head breakdown */}
+            {opponentStats.length > 0 && (
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, fontSize: 10.5, letterSpacing: '0.12em', color: 'var(--text)' }}>HEAD-TO-HEAD</div>
+                  {opponentFilter && (
+                    <button onClick={() => setOpponentFilter(null)} className="text-xs font-medium" style={{ color: 'var(--accent)' }}>
+                      Clear filter
+                    </button>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  {opponentStats.map(s => (
+                    <OpponentCard
+                      key={s.profile?.id}
+                      stats={s}
+                      isActive={opponentFilter === s.profile?.id}
+                      onFilter={() => setOpponentFilter(prev => prev === s.profile?.id ? null : s.profile?.id)}
+                      statView={getCardView(s.profile?.id)}
+                      onStatViewChange={mode => setCardStatView(prev => ({ ...prev, [s.profile?.id]: mode }))}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Match history */}
+            <div>
+              <div className="mb-2 flex items-center gap-2">
+                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, fontSize: 10.5, letterSpacing: '0.12em', color: 'var(--text)' }}>MATCH HISTORY</div>
+                {opponentFilter && (
+                  <span className="text-xs font-normal" style={{ color: 'var(--sub)' }}>
+                    · vs {activeOpponentName}
+                  </span>
+                )}
+              </div>
+              {filtered.length === 0 ? (
+                <p className="py-8 text-center text-sm" style={{ color: 'var(--sub)' }}>No matches in this range</p>
+              ) : (
+                <div className="space-y-4">
+                  {matchDateGroups.map(({ date, matches: dayMatches }) => (
+                    <div key={date.toDateString()} className="space-y-2">
+                      <VSDaySummary matches={dayMatches} opponentName={activeOpponentName} />
+                      {dayMatches.map(m => (
+                        <MatchRow key={m.id} match={m} />
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   )
 }

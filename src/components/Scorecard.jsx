@@ -710,3 +710,35 @@ export function EditableFrameGrid({ frames, onChange }) {
     </div>
   )
 }
+
+// ── Parse warning banner (collapsible) ───────────────────────────────────────
+
+export function ParseWarningBanner({ warnings }) {
+  const [open, setOpen] = useState(false)
+  if (!warnings?.length) return null
+  return (
+    <div className="mb-2 overflow-hidden rounded-lg" style={{ border: '1px solid color-mix(in srgb, #f59e0b 30%, transparent)' }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="flex w-full items-center justify-between px-3 py-2 text-left"
+        style={{ background: 'color-mix(in srgb, #f59e0b 12%, transparent)' }}
+      >
+        <span className="text-[11px] font-semibold" style={{ color: '#b45309' }}>
+          {warnings.length} correction{warnings.length !== 1 ? 's' : ''} made to AI parse — tap to review
+        </span>
+        <svg
+          className="h-3 w-3 shrink-0"
+          style={{ color: '#b45309', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 150ms ease' }}
+          viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+        >
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+      {open && (
+        <ul className="space-y-0.5 px-3 py-2 text-[10px]" style={{ background: 'color-mix(in srgb, #f59e0b 6%, transparent)', color: '#92400e' }}>
+          {warnings.map((w, i) => <li key={i}>• {w}</li>)}
+        </ul>
+      )}
+    </div>
+  )
+}

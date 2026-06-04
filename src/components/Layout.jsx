@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import MyGames, { UploadModal } from './MyGames'
 import FindFriends from './FindFriends'
 import VSMatches from './VSMatches'
-import Trends from './Trends'
+import Stats from './Stats'
 import VSSubmitModal from './VSSubmitModal'
 import UserMenu from './UserMenu'
 import SettingsModal from './SettingsModal'
@@ -38,6 +38,15 @@ const NAV_ITEMS = [
     ),
   },
   {
+    id: 'stats',
+    label: 'Stats',
+    icon: (
+      <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+      </svg>
+    ),
+  },
+  {
     id: 'find-friends',
     label: 'Friends',
     icon: (
@@ -46,15 +55,6 @@ const NAV_ITEMS = [
         <circle cx="9" cy="7" r="4"/>
         <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
         <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-      </svg>
-    ),
-  },
-  {
-    id: 'trends',
-    label: 'Trends',
-    icon: (
-      <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
       </svg>
     ),
   },
@@ -380,7 +380,7 @@ export default function Layout({ session }) {
           )}
           {activePage === 'find-friends' && <FindFriends session={session} />}
           {activePage === 'vs-matches' && <VSMatches session={session} />}
-          {activePage === 'trends' && <Trends session={session} theme={theme} />}
+          {activePage === 'stats' && <Stats session={session} theme={theme} />}
         </div>
       </main>
 
@@ -483,7 +483,7 @@ export default function Layout({ session }) {
           session={session}
           profile={profile}
           theme={theme}
-          navItems={NAV_ITEMS}
+          navItems={NAV_ITEMS.filter(i => i.id !== 'find-friends')}
           onSave={handleSaveSettings}
           onClose={() => setSettingsOpen(false)}
         />

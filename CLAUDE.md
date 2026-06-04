@@ -68,6 +68,7 @@ Both major workflows use a **phase/step state machine** pattern — a single sta
 - Desktop: fixed sidebar (`w-64`) + top header
 - Mobile: hamburger → slide-in sidebar overlay; FAB for quick game upload
 - Modals use a fixed overlay with backdrop blur
+- **Page root containers must cancel Layout padding.** Layout's content wrapper uses `py-6` (24px top padding). Every page component's root div must apply `style={{ marginTop: -24 }}` so that sticky headers land at exactly `top: FIXED_H` (56 px) and page-to-page navigation feels fixed. MyGames already does this; all new and existing pages must follow the same pattern.
 
 ### Environment Variables
 
@@ -119,6 +120,8 @@ VITE_GEMINI_API_KEY=
 ### Bowling Chart Rules
 - Score-based Y-axes (any chart showing bowling scores) always cap at **300** — the maximum possible score. Never use `'auto'` as the Y-axis upper bound for score data.
 - Score distribution histograms must give scores of exactly 300 their own dedicated bucket labeled `"300"`, separate from the 280–299 bucket.
+- **Score distribution buckets must always be pre-defined and complete.** Do not generate buckets dynamically from `min → max` of actual data — that causes gaps when no scores fall in a range. Always use this fixed set: one `"< 100"` bucket for all scores 0–99, then 20-point buckets from 100–119 through 280–299, then a dedicated `"300"` bucket for perfect games. Every bucket must always appear in the chart data (with count 0 if empty) so the x-axis is never missing a range.
+- **Chart whitespace:** All Recharts chart components (`BarChart`, `LineChart`, etc.) must use a non-negative left margin. Use `margin={{ left: 0, right: 16, top: 4, bottom: 0 }}` as the minimum baseline. Never use a negative `left` margin value — it causes the chart to clip against the container edge.
 
 ### Hard Rules
 - Do not add sections, features, or content not in the reference

@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import { parseScorecard } from '../lib/gemini'
-import { computeStats, computeScores, normalizeFrames } from '../lib/parseGame'
-import { StatTable, EditableFrameGrid, MiniGrid, StatStrip } from './Scorecard'
+import { computeStats, computeScores } from '../lib/parseGame'
+import { sanitizeFrames } from '../lib/validateFrames'
+import { StatTable, EditableFrameGrid, MiniGrid, StatStrip, ParseWarningBanner } from './Scorecard'
 import { loadUploadPrefs, saveUploadPrefs } from '../lib/uploadPrefs'
 
 // ── Shared modal shell ───────────────────────────────────────────────────────
@@ -516,6 +517,7 @@ export function UploadModal({ session, profile, onClose, onSaved }) {
   })
   const [parsedData, setParsedData] = useState(null)
   const [aiFrames, setAiFrames] = useState(null)
+  const [parseWarnings, setParseWarnings] = useState([])
   const [error, setError] = useState(null)
 
   const cameraInputRef = useRef(null)
@@ -529,6 +531,7 @@ export function UploadModal({ session, profile, onClose, onSaved }) {
     setError(null)
     setParsedData(null)
     setAiFrames(null)
+    setParseWarnings([])
     setPhase('input')
   }
 
@@ -546,8 +549,10 @@ export function UploadModal({ session, profile, onClose, onSaved }) {
         setPhase('input')
         return
       }
-      const scoredFrames = computeScores(normalizeFrames(result.frames))
+      const { frames: sanitized, warnings } = sanitizeFrames(result.frames)
+      const scoredFrames = computeScores(sanitized)
       const stats = computeStats(scoredFrames)
+      setParseWarnings(warnings)
       setAiFrames(JSON.parse(JSON.stringify(scoredFrames)))
       setParsedData({ frames: scoredFrames, ...stats })
       setPhase('review')
@@ -675,6 +680,7 @@ export function UploadModal({ session, profile, onClose, onSaved }) {
             <span className="text-xs font-semibold" style={{ color: 'var(--text)' }}>Review &amp; edit before saving</span>
             <span className="text-[10px]" style={{ color: 'var(--sub)' }}>Tap any ball to edit</span>
           </div>
+          <ParseWarningBanner warnings={parseWarnings} />
           <div className="mb-3 flex items-center justify-between rounded-xl px-3 py-2" style={{ background: 'var(--elevated)' }}>
             <div className="flex items-baseline gap-1.5">
               <span className="font-display text-3xl" style={{ color: 'var(--text)' }}>{totalScore}</span>
