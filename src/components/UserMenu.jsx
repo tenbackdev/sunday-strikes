@@ -86,7 +86,7 @@ function SettingToggle({ offLabel, onLabel, checked, onChange }) {
 const PAGE_OPTIONS = [
   { value: 'my-games', label: 'My Games' },
   { value: 'vs-matches', label: 'VS' },
-  { value: 'find-friends', label: 'Friends' },
+  { value: 'stats', label: 'Stats' },
 ]
 
 export default function UserMenu({ session, theme, onThemeChange, cardPreview, onCardPreviewChange, onProfileSave, profileAvatarColor }) {

@@ -57,6 +57,13 @@ BALL NOTATION — use exactly these strings:
 
 STRIKE vs SPARE: A strike shows only ONE ball for the frame (frames 1-9). A number followed by "/" is a SPARE — record as ["number", "/"]. Only use "X" when all 10 pins fell on the FIRST ball with no second ball shown.
 
+CONSTRAINTS:
+- Frames 1–9: a strike ("X") is the only ball in that frame — never add a second ball.
+- Frames 1–9: for non-strike frames the two ball values must sum to 10 or fewer pins; if they sum to exactly 10 use "/" for ball 2.
+- Frame 10: record exactly 3 balls when ball 1 is "X" or balls 1+2 form a spare; otherwise record exactly 2 balls.
+- Frame 10: ball 3 can be "/" only when ball 2 was not "X" and left pins standing (ball 2 was a digit or "-").
+- Ball 1 of every frame is always a pin count: "X", "-", or "1"–"9". It is never "/".
+
 FRAME 10 RULES:
 - Ball 1 strike → 3 total balls: ["X", "X", "X"] or ["X", "7", "/"] etc.
 - Balls 1+2 spare → 3 total balls: ["9", "/", "X"] etc.
@@ -129,6 +136,13 @@ BALL NOTATION — use exactly these strings:
 STRIKE vs SPARE — pay close attention:
 - A strike shows only ONE ball for the frame (frames 1-9). If you see a number followed by a "/" that is a SPARE, not a strike — record it as ["number", "/"].
 - Only use "X" when all 10 pins were knocked down on the FIRST ball of a frame with no second ball shown.
+
+CONSTRAINTS:
+- Frames 1–9: a strike ("X") is the only ball in that frame — never add a second ball.
+- Frames 1–9: for non-strike frames the two ball values must sum to 10 or fewer pins; if they sum to exactly 10 use "/" for ball 2.
+- Frame 10: record exactly 3 balls when ball 1 is "X" or balls 1+2 form a spare; otherwise record exactly 2 balls.
+- Frame 10: ball 3 can be "/" only when ball 2 was not "X" and left pins standing (ball 2 was a digit or "-").
+- Ball 1 of every frame is always a pin count: "X", "-", or "1"–"9". It is never "/".
 
 FRAME 10 RULES:
 - Ball 1 is strike → 2 more fill balls (3 total); e.g. ["X", "X", "X"] or ["X", "7", "/"]

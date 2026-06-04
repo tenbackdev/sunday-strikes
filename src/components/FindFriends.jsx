@@ -173,10 +173,11 @@ export default function FindFriends({ session }) {
   const divideStyle = { borderTop: '1px solid var(--border)' }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" style={{ marginTop: -24, paddingTop: 16 }}>
       <div>
+        <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 700, letterSpacing: '0.2em', color: 'var(--sub)', marginBottom: 4 }}>YOUR CREW</p>
         <h2 className="font-display text-3xl" style={{ color: 'var(--text)' }}>Friends</h2>
-        <p className="mt-1 text-sm" style={{ color: 'var(--sub)' }}>Search for bowlers by name or email address</p>
+        <p className="mt-1 text-sm" style={{ color: 'var(--sub)' }}>Find bowlers by name or email</p>
       </div>
 
       {/* Search input */}
@@ -212,41 +213,39 @@ export default function FindFriends({ session }) {
       </div>
 
       {/* Search results panel */}
-      <div className="overflow-hidden rounded-xl" style={{ ...panelStyle, minHeight: '8rem' }}>
-        {!query.trim() ? (
-          <div className="flex items-center justify-center py-10 text-sm" style={{ color: 'color-mix(in srgb, var(--sub) 50%, transparent)' }}>
-            Start typing to search
-          </div>
-        ) : searching ? (
-          <div className="flex items-center justify-center py-10 text-sm" style={{ color: 'var(--sub)' }}>Searching…</div>
-        ) : results.length === 0 ? (
-          <div className="flex items-center justify-center py-10 text-sm" style={{ color: 'var(--sub)' }}>No users found for "{query}"</div>
-        ) : (
-          <ul className="max-h-64 overflow-y-auto">
-            {results.map((profile, i) => {
-              const req = getRequestStatus(profile.id)
-              return (
-                <li key={profile.id} className="flex items-center justify-between px-4 py-3.5" style={i > 0 ? divideStyle : {}}>
-                  <ProfileRow profile={profile} />
-                  <FriendButton req={req} onSend={() => sendRequest(profile.id)} onRespond={respondToRequest} />
-                </li>
-              )
-            })}
-          </ul>
-        )}
+      <div>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, fontSize: 10.5, letterSpacing: '0.12em', color: 'var(--text)', marginBottom: 10 }}>SEARCH RESULTS</div>
+        <div className="overflow-hidden rounded-xl" style={{ ...panelStyle, minHeight: '8rem' }}>
+          {!query.trim() ? (
+            <div className="flex items-center justify-center py-10 text-sm" style={{ color: 'color-mix(in srgb, var(--sub) 50%, transparent)' }}>
+              Start typing to search
+            </div>
+          ) : searching ? (
+            <div className="flex items-center justify-center py-10 text-sm" style={{ color: 'var(--sub)' }}>Searching…</div>
+          ) : results.length === 0 ? (
+            <div className="flex items-center justify-center py-10 text-sm" style={{ color: 'var(--sub)' }}>No users found for "{query}"</div>
+          ) : (
+            <ul className="max-h-64 overflow-y-auto">
+              {results.map((profile, i) => {
+                const req = getRequestStatus(profile.id)
+                return (
+                  <li key={profile.id} className="flex items-center justify-between px-4 py-3.5" style={i > 0 ? divideStyle : {}}>
+                    <ProfileRow profile={profile} />
+                    <FriendButton req={req} onSend={() => sendRequest(profile.id)} onRespond={respondToRequest} />
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </div>
       </div>
 
       {/* Pending requests */}
       {!loadingRequests && incomingRequests.length > 0 && (
         <div>
-          <div className="mb-3 flex items-center gap-2">
-            <h3 className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Pending Requests</h3>
-            <span
-              className="rounded-full px-2 py-0.5 text-xs font-semibold"
-              style={{ background: 'color-mix(in srgb, var(--loss) 15%, transparent)', color: 'var(--loss)' }}
-            >
-              {incomingRequests.length}
-            </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, fontSize: 10.5, letterSpacing: '0.12em', color: 'var(--text)' }}>PENDING REQUESTS</span>
+            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5, fontWeight: 700, color: 'var(--loss)', background: 'color-mix(in srgb, var(--loss) 15%, transparent)', border: '1px solid color-mix(in srgb, var(--loss) 25%, transparent)', borderRadius: 999, padding: '0 7px' }}>{incomingRequests.length}</span>
           </div>
           <div className="overflow-hidden rounded-xl" style={panelStyle}>
             <ul>
@@ -278,15 +277,10 @@ export default function FindFriends({ session }) {
 
       {/* My friends */}
       <div>
-        <div className="mb-3 flex items-center gap-2">
-          <h3 className="text-sm font-semibold" style={{ color: 'var(--text)' }}>My Friends</h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, fontSize: 10.5, letterSpacing: '0.12em', color: 'var(--text)' }}>MY FRIENDS</span>
           {!loadingRequests && (
-            <span
-              className="rounded-full px-2 py-0.5 text-xs font-semibold"
-              style={{ background: 'color-mix(in srgb, var(--accent) 15%, transparent)', color: 'var(--accent)' }}
-            >
-              {friends.length}
-            </span>
+            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5, fontWeight: 700, color: 'var(--accent)', background: 'color-mix(in srgb, var(--accent) 15%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 25%, transparent)', borderRadius: 999, padding: '0 7px' }}>{friends.length}</span>
           )}
         </div>
         <div className="overflow-hidden rounded-xl" style={panelStyle}>
