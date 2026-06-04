@@ -407,10 +407,10 @@ export default function VSMatches({ session }) {
               onClick={() => { setTimeFilter(f.key); setOpponentFilter(null) }}
               className="flex-1 rounded-lg py-1.5 text-xs font-medium transition-all"
               style={timeFilter === f.key ? {
-                background: 'var(--accent)',
-                color: 'var(--acc-text)',
-                boxShadow: '0 1px 3px color-mix(in srgb, var(--accent) 35%, transparent)',
-              } : { color: 'var(--sub)' }}
+                background: 'color-mix(in srgb, var(--accent) 15%, transparent)',
+                color: 'var(--accent)',
+                border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)',
+              } : { color: 'var(--sub)', border: '1px solid transparent' }}
             >
               {f.label}
             </button>

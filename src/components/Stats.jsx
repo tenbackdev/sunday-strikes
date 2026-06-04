@@ -374,44 +374,42 @@ export default function Stats({ session, theme }) {
 
   return (
     <div style={{ marginTop: -24 }}>
-      {/* ── Sticky filter header — single row ── */}
+      {/* ── Sticky filter header ── */}
       <div style={{ position: 'sticky', top: FIXED_H, zIndex: 18, background: 'var(--bg)', paddingTop: 8, paddingBottom: 12 }}>
-        <div className="flex items-center gap-2">
-          {/* Category tabs — left */}
-          <div className="flex gap-1 rounded-xl p-1" style={{ background: 'var(--elevated)', border: '1px solid var(--border)' }}>
-            {STAT_TABS.map(t => (
-              <button
-                key={t.key}
-                onClick={() => setStatsTab(t.key)}
-                className="rounded-lg px-3 py-1.5 text-xs font-medium"
-                style={statsTab === t.key ? {
-                  background: 'color-mix(in srgb, var(--accent) 15%, transparent)',
-                  color: 'var(--accent)',
-                  border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)',
-                } : { color: 'var(--sub)', border: '1px solid transparent' }}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
+        {/* Time filter — top row */}
+        <div className="flex gap-1 rounded-xl p-1 mb-2" style={{ background: 'var(--elevated)', border: '1px solid var(--border)' }}>
+          {TIME_FILTERS.map(f => (
+            <button
+              key={f.key}
+              onClick={() => changeTimeFilter(f.key)}
+              className="flex-1 rounded-lg py-1.5 text-xs font-medium"
+              style={timeFilter === f.key ? {
+                background: 'color-mix(in srgb, var(--accent) 15%, transparent)',
+                color: 'var(--accent)',
+                border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)',
+              } : { color: 'var(--sub)', border: '1px solid transparent' }}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
 
-          {/* Time filter — right */}
-          <div className="flex gap-1 rounded-xl p-1 ml-auto" style={{ background: 'var(--elevated)', border: '1px solid var(--border)' }}>
-            {TIME_FILTERS.map(f => (
-              <button
-                key={f.key}
-                onClick={() => changeTimeFilter(f.key)}
-                className="rounded-lg px-2 py-1 text-xs font-medium"
-                style={timeFilter === f.key ? {
-                  background: 'color-mix(in srgb, var(--accent) 15%, transparent)',
-                  color: 'var(--accent)',
-                  border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)',
-                } : { color: 'var(--sub)', border: '1px solid transparent' }}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
+        {/* Category tabs — bottom row */}
+        <div className="flex gap-1 rounded-xl p-1" style={{ background: 'var(--elevated)', border: '1px solid var(--border)' }}>
+          {STAT_TABS.map(t => (
+            <button
+              key={t.key}
+              onClick={() => setStatsTab(t.key)}
+              className="flex-1 rounded-lg py-1.5 text-xs font-medium"
+              style={statsTab === t.key ? {
+                background: 'color-mix(in srgb, var(--accent) 15%, transparent)',
+                color: 'var(--accent)',
+                border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)',
+              } : { color: 'var(--sub)', border: '1px solid transparent' }}
+            >
+              {t.label}
+            </button>
+          ))}
         </div>
       </div>
 
