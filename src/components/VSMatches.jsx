@@ -87,12 +87,12 @@ function resultStyle(r) {
 function StatCard({ label, value, sub, nowrap }) {
   return (
     <div
-      className="rounded-xl px-4 py-3 text-center"
+      className="rounded-xl px-4 py-3 text-center flex flex-col"
       style={{ background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}
     >
       <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', color: 'var(--sub)' }}>{label}</p>
-      <p className="mt-0.5" style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: nowrap ? 'clamp(12px, 4vw, 28px)' : 30, letterSpacing: '-0.02em', lineHeight: 1.1, color: 'var(--text)', whiteSpace: nowrap ? 'nowrap' : undefined }}>{value}</p>
-      {sub && <p className="text-[10px]" style={{ color: 'var(--sub)' }}>{sub}</p>}
+      <p className="mt-0.5 flex-1 flex items-center justify-center" style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: nowrap ? 'clamp(12px, 4vw, 28px)' : 30, letterSpacing: '-0.02em', lineHeight: 1.1, color: 'var(--text)', whiteSpace: nowrap ? 'nowrap' : undefined }}>{value}</p>
+      {sub && <p className="mt-auto text-[10px]" style={{ color: 'var(--sub)' }}>{sub}</p>}
     </div>
   )
 }
