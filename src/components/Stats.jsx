@@ -120,11 +120,97 @@ function FirstBallTooltip({ active, payload, label }) {
   )
 }
 
-function ChartCard({ title, children }) {
+function countRacks(frames) {
+  let racks = 0
+  for (const frame of frames) {
+    if (frame.frame !== 10) { racks++; continue }
+    const [b1, b2] = frame.balls
+    racks++
+    if (b1 === 'X') {
+      racks++
+      if (b2 === 'X') racks++
+    } else if (b2 === '/') {
+      racks++
+    }
+  }
+  return racks
+}
+
+function extractStreaks(frames) {
+  const isStrike = []
+  for (const frame of frames) {
+    if (frame.frame !== 10) {
+      isStrike.push(frame.balls[0] === 'X')
+    } else {
+      const [b1, b2, b3] = frame.balls
+      isStrike.push(b1 === 'X')
+      if (b1 === 'X') {
+        isStrike.push(b2 === 'X')
+        if (b2 === 'X') isStrike.push(b3 === 'X')
+      }
+    }
+  }
+  const streaks = []
+  let run = 0
+  for (const s of isStrike) {
+    if (s) { run++ }
+    else { if (run > 0) streaks.push(run); run = 0 }
+  }
+  if (run > 0) streaks.push(run)
+  return streaks
+}
+
+const STREAK_NAMES = ['', 'Single', 'Double', 'Turkey', '4-Bagger', '5-Bagger', '6-Bagger', '7-Bagger', '8-Bagger', '9-Bagger', '10-Bagger', '11-Bagger', 'Perfect (12)']
+
+function StrikeRangeBandTooltip({ active, payload }) {
+  if (!active || !payload?.length) return null
+  const d = payload[0]?.payload
+  if (!d) return null
+  return (
+    <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', fontSize: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
+      <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>{fmtDateLong(d.date)}</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 3, fontFamily: "'JetBrains Mono', monospace", fontSize: 11 }}>
+        <span style={{ color: 'var(--sub)' }}>High <span style={{ color: 'var(--text)', fontWeight: 700 }}>{d.high}</span></span>
+        <span style={{ color: 'var(--sub)' }}>Avg  <span style={{ color: 'var(--accent)', fontWeight: 700 }}>{d.avg}</span></span>
+        <span style={{ color: 'var(--sub)' }}>Low  <span style={{ color: 'var(--text)', fontWeight: 700 }}>{d.low}</span></span>
+      </div>
+    </div>
+  )
+}
+
+function StreakTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null
+  const count = payload[0]?.value
+  const idx = Number(label)
+  return (
+    <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', fontSize: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
+      <div style={{ fontFamily: "'JetBrains Mono', monospace", color: 'var(--text)', fontWeight: 700 }}>{count} {count === 1 ? 'time' : 'times'}</div>
+      <div style={{ fontFamily: "'JetBrains Mono', monospace", color: 'var(--sub)', fontSize: 10 }}>{STREAK_NAMES[idx] ?? `${idx}-Bagger`}</div>
+    </div>
+  )
+}
+
+function RunTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null
+  const count = payload[0]?.value
+  return (
+    <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', fontSize: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
+      <div style={{ fontFamily: "'JetBrains Mono', monospace", color: 'var(--text)', fontWeight: 700 }}>{count} {count === 1 ? 'game' : 'games'}</div>
+      <div style={{ fontFamily: "'JetBrains Mono', monospace", color: 'var(--sub)', fontSize: 10 }}>
+        {label === '0' ? 'no opening strike' : label === '12' ? 'perfect game opener' : `opened with ${label} in a row`}
+      </div>
+    </div>
+  )
+}
+
+function ChartCard({ title, titleRight, children }) {
   return (
     <div style={{ border: '1px solid var(--border)', borderRadius: 12, background: 'var(--card)', paddingTop: 14, paddingBottom: 10, overflow: 'hidden' }}>
-      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', color: 'var(--sub)', marginBottom: 10, paddingLeft: 16 }}>
-        {title}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, paddingLeft: 16, paddingRight: 16 }}>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', color: 'var(--sub)' }}>
+          {title}
+        </div>
+        {titleRight}
       </div>
       {children}
     </div>
@@ -168,6 +254,7 @@ export default function Stats({ session, theme }) {
   const [statsTab,   setStatsTab]   = useState('overview')
   const [games, setGames]           = useState([])
   const [isLoading, setIsLoading]   = useState(true)
+  const [streakMode, setStreakMode]  = useState('inclusive')
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const colors = useMemo(() => getChartColors(), [theme])
@@ -256,48 +343,110 @@ export default function Stats({ session, theme }) {
   const strikesData = useMemo(() => {
     if (!games.length) return null
     const allStats = games.map(g => computeStats(g.frames ?? []))
-    const totalFrames = games.length * 10
+    const totalRacks = games.reduce((s, g) => s + countRacks(g.frames ?? []), 0)
 
-    // Consecutive strike sequences within each game
-    let turkeyCount = 0
-    let doubleCount = 0
-    let bestInitialRun = 0
+    const allStreaks = []
+    for (let i = 0; i < games.length; i++) {
+      allStreaks.push(...extractStreaks(games[i].frames ?? []))
+    }
 
-    for (const g of games) {
-      const frames = g.frames ?? []
-      const s = computeStats(frames)
-      if (s.initialRun > bestInitialRun) bestInitialRun = s.initialRun
-
-      // Count doubles and turkeys within each game frame sequence
-      let run = 0
-      for (const f of frames.slice(0, 9)) {
-        if (f[0] === 'X') { run++ } else { run = 0 }
-        if (run === 2) doubleCount++
-        if (run === 3) turkeyCount++
+    // Best consecutive strike run spanning game boundaries (chronological order)
+    const sorted = [...games].sort((a, b) => a.played_at.localeCompare(b.played_at))
+    let bestCrossGameRun = 0
+    let crossRun = 0
+    for (const g of sorted) {
+      for (const frame of g.frames ?? []) {
+        if (frame.frame !== 10) {
+          if (frame.balls[0] === 'X') { crossRun++; if (crossRun > bestCrossGameRun) bestCrossGameRun = crossRun }
+          else crossRun = 0
+        } else {
+          const [b1, b2, b3] = frame.balls ?? []
+          if (b1 === 'X') {
+            crossRun++; if (crossRun > bestCrossGameRun) bestCrossGameRun = crossRun
+            if (b2 === 'X') {
+              crossRun++; if (crossRun > bestCrossGameRun) bestCrossGameRun = crossRun
+              if (b3 === 'X') { crossRun++; if (crossRun > bestCrossGameRun) bestCrossGameRun = crossRun }
+              else crossRun = 0
+            } else crossRun = 0
+          } else crossRun = 0
+        }
       }
     }
 
+    // 10th frame strikes avg per game (0–3)
+    let tenthStrikes = 0
+    for (const g of games) {
+      const f10 = (g.frames ?? []).find(f => f.frame === 10)
+      if (!f10) continue
+      const [b1, b2, b3] = f10.balls ?? []
+      if (b1 === 'X') {
+        tenthStrikes++
+        if (b2 === 'X') { tenthStrikes++; if (b3 === 'X') tenthStrikes++ }
+      } else if (b2 === '/' && b3 === 'X') {
+        tenthStrikes++
+      }
+    }
+    const tenthFrameAvg = (tenthStrikes / games.length).toFixed(2)
+
     const totalStrikes = allStats.reduce((s, x) => s + x.strikes, 0)
-    const strikeRate = totalFrames > 0 ? Math.round((totalStrikes / totalFrames) * 100) : 0
+    const strikeRate = totalRacks > 0 ? Math.round((totalStrikes / totalRacks) * 100) : 0
 
     // Strikes-per-game distribution (0–12 possible)
     const strikeCounts = allStats.map(s => s.strikes)
-    const maxStrikes = 12
-    const strikeDist = Array.from({ length: maxStrikes + 1 }, (_, i) => ({
+    const strikeDist = Array.from({ length: 13 }, (_, i) => ({
       label: String(i),
       count: strikeCounts.filter(c => c === i).length,
     }))
     const peakStrikeDist = Math.max(...strikeDist.map(d => d.count))
 
+    // Streak distribution (1–12) — two counting modes
+    const countsA = Array(13).fill(0)
+    const countsB = Array(13).fill(0)
+    for (const len of allStreaks) {
+      if (len < 1 || len > 12) continue
+      countsB[len]++
+      if (len === 1) { countsA[1]++ }
+      else { for (let k = 2; k <= len; k++) countsA[k]++ }
+    }
+    const streakDist = Array.from({ length: 12 }, (_, i) => ({
+      label: String(i + 1),
+      countA: countsA[i + 1],
+      countB: countsB[i + 1],
+    }))
+
+    // Opening run distribution (0–12)
+    const runDist = Array.from({ length: 13 }, (_, i) => ({
+      label: String(i),
+      count: allStats.filter(s => s.initialRun === i).length,
+    }))
+    const peakRunDist = Math.max(...runDist.map(d => d.count))
+
+    // Strikes per session — high / avg / low by day
+    const dayMap = {}
+    for (let i = 0; i < games.length; i++) {
+      const day = games[i].played_at.slice(0, 10)
+      if (!dayMap[day]) dayMap[day] = []
+      dayMap[day].push(allStats[i].strikes)
+    }
+    const strikesByDay = Object.entries(dayMap)
+      .map(([date, vals]) => {
+        const high = Math.max(...vals)
+        const low  = Math.min(...vals)
+        return { date, high, low, avg: parseFloat((vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1)), bandWidth: high - low }
+      })
+      .sort((a, b) => a.date.localeCompare(b.date))
+
     return {
       ribbon: [
-        { label: 'STRIKE RATE', value: `${strikeRate}%` },
-        { label: 'AVG / GAME',  value: games.length ? (totalStrikes / games.length).toFixed(1) : '0' },
-        { label: 'TURKEYS',     value: turkeyCount },
-        { label: 'DOUBLES',     value: doubleCount },
-        { label: 'BEST RUN',    value: bestInitialRun },
+        { label: 'STRIKE %',    value: `${strikeRate}%` },
+        { label: 'AVG / GAME',  value: (totalStrikes / games.length).toFixed(1) },
+        { label: 'BEST STREAK', value: bestCrossGameRun },
+        { label: '10TH FRAME',  value: tenthFrameAvg },
       ],
       strikeDist: strikeDist.map(d => ({ ...d, isMax: peakStrikeDist > 0 && d.count === peakStrikeDist })),
+      streakDist,
+      runDist: runDist.map(d => ({ ...d, isMax: peakRunDist > 0 && d.count === peakRunDist })),
+      strikesByDay,
     }
   }, [games])
 
@@ -539,41 +688,165 @@ export default function Stats({ session, theme }) {
       {!isLoading && statsTab === 'strikes' && (
         <>
           {!hasGames && <EmptyState />}
-          {hasGames && strikesData && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}>
+          {hasGames && strikesData && (() => {
+            const sTickInterval = strikesData.strikesByDay.length > 20
+              ? Math.ceil(strikesData.strikesByDay.length / 10) - 1
+              : 'preserveStartEnd'
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}>
 
-              <Ribbon stats={strikesData.ribbon} />
+                <Ribbon stats={strikesData.ribbon} />
 
-              <ChartCard title="STRIKES PER GAME">
-                <ResponsiveContainer width="100%" height={200}>
-                  <BarChart data={strikesData.strikeDist} margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={colors.border} strokeOpacity={0.6} vertical={false} />
-                    <XAxis
-                      dataKey="label"
-                      interval={0}
-                      tick={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fill: colors.sub }}
-                      axisLine={false}
-                      tickLine={false}
-                    />
-                    <YAxis
-                      allowDecimals={false}
-                      tick={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fill: colors.sub }}
-                      axisLine={false}
-                      tickLine={false}
-                      width={30}
-                    />
-                    <Tooltip content={<CountTooltip />} />
-                    <Bar dataKey="count" radius={[3, 3, 0, 0]} isAnimationActive={false}>
-                      {strikesData.strikeDist.map((entry, i) => (
-                        <Cell key={i} fill={colors.accent} fillOpacity={entry.isMax ? 1 : 0.35} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </ChartCard>
+                {/* Chart 1 — Strikes Per Session: High / Avg / Low */}
+                <ChartCard title="STRIKES PER SESSION — HIGH / AVG / LOW">
+                  <ResponsiveContainer width="100%" height={220}>
+                    <ComposedChart data={strikesData.strikesByDay} margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={colors.border} strokeOpacity={0.6} vertical={false} />
+                      <XAxis
+                        dataKey="date"
+                        tickFormatter={fmtDate}
+                        interval={sTickInterval}
+                        padding={{ left: 12, right: 12 }}
+                        tick={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fill: colors.sub }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        domain={[0, 12]}
+                        ticks={[0, 3, 6, 9, 12]}
+                        tick={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fill: colors.sub }}
+                        axisLine={false}
+                        tickLine={false}
+                        width={24}
+                      />
+                      <Tooltip content={<StrikeRangeBandTooltip />} />
+                      <Area type="monotone" dataKey="low"       stackId="band" fill="transparent"   fillOpacity={1} stroke="none" isAnimationActive={false} />
+                      <Area type="monotone" dataKey="bandWidth" stackId="band" fill={colors.accent} fillOpacity={0.14} stroke="none" isAnimationActive={false} />
+                      <Line type="monotone" dataKey="high" stroke={colors.sub} strokeWidth={1} strokeDasharray="4 2" dot={false} isAnimationActive={false} />
+                      <Line type="monotone" dataKey="low"  stroke={colors.sub} strokeWidth={1} strokeDasharray="4 2" dot={false} isAnimationActive={false} />
+                      <Line type="monotone" dataKey="avg"  stroke={colors.accent} strokeWidth={2.5} dot={strikesData.strikesByDay.length === 1 ? { fill: colors.accent, r: 4, strokeWidth: 0 } : false} activeDot={{ r: 4, fill: colors.accent, strokeWidth: 0 }} isAnimationActive={false} />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </ChartCard>
 
-            </div>
-          )}
+                {/* Charts 2 + 3 — side by side on sm+ */}
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+
+                  {/* Chart 2 — Streak Distribution with A/B toggle */}
+                  <ChartCard
+                    title="STREAK DISTRIBUTION"
+                    titleRight={
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        {[['inclusive', 'CUMULATIVE'], ['exclusive', 'EXACT']].map(([mode, label]) => (
+                          <button
+                            key={mode}
+                            onClick={() => setStreakMode(mode)}
+                            style={streakMode === mode ? {
+                              padding: '2px 7px', borderRadius: 6,
+                              fontSize: 8, fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, letterSpacing: '0.05em',
+                              background: 'color-mix(in srgb, var(--accent) 15%, transparent)',
+                              color: 'var(--accent)',
+                              border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)',
+                              cursor: 'pointer',
+                            } : {
+                              padding: '2px 7px', borderRadius: 6,
+                              fontSize: 8, fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, letterSpacing: '0.05em',
+                              color: 'var(--sub)', border: '1px solid var(--border)',
+                              background: 'transparent', cursor: 'pointer',
+                            }}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    }
+                  >
+                    <ResponsiveContainer width="100%" height={200}>
+                      <BarChart data={strikesData.streakDist} margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke={colors.border} strokeOpacity={0.6} vertical={false} />
+                        <XAxis
+                          dataKey="label"
+                          interval={0}
+                          tick={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fill: colors.sub }}
+                          axisLine={false}
+                          tickLine={false}
+                        />
+                        <YAxis
+                          allowDecimals={false}
+                          tick={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fill: colors.sub }}
+                          axisLine={false}
+                          tickLine={false}
+                          width={30}
+                        />
+                        <Tooltip content={<StreakTooltip />} />
+                        <Bar dataKey={streakMode === 'inclusive' ? 'countA' : 'countB'} radius={[3, 3, 0, 0]} isAnimationActive={false} fill={colors.accent} fillOpacity={0.6} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </ChartCard>
+
+                  {/* Chart 3 — Opening Run Distribution */}
+                  <ChartCard title="OPENING RUN — STRIKES FROM FRAME 1">
+                    <ResponsiveContainer width="100%" height={200}>
+                      <BarChart data={strikesData.runDist} margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke={colors.border} strokeOpacity={0.6} vertical={false} />
+                        <XAxis
+                          dataKey="label"
+                          interval={0}
+                          tick={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fill: colors.sub }}
+                          axisLine={false}
+                          tickLine={false}
+                        />
+                        <YAxis
+                          allowDecimals={false}
+                          tick={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fill: colors.sub }}
+                          axisLine={false}
+                          tickLine={false}
+                          width={30}
+                        />
+                        <Tooltip content={<RunTooltip />} />
+                        <Bar dataKey="count" radius={[3, 3, 0, 0]} isAnimationActive={false}>
+                          {strikesData.runDist.map((entry, i) => (
+                            <Cell key={i} fill={colors.accent} fillOpacity={entry.isMax ? 1 : 0.35} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </ChartCard>
+
+                </div>
+
+                {/* Chart 4 — Strikes Per Game (count distribution) */}
+                <ChartCard title="STRIKES PER GAME">
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={strikesData.strikeDist} margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={colors.border} strokeOpacity={0.6} vertical={false} />
+                      <XAxis
+                        dataKey="label"
+                        interval={0}
+                        tick={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fill: colors.sub }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        allowDecimals={false}
+                        tick={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fill: colors.sub }}
+                        axisLine={false}
+                        tickLine={false}
+                        width={30}
+                      />
+                      <Tooltip content={<CountTooltip />} />
+                      <Bar dataKey="count" radius={[3, 3, 0, 0]} isAnimationActive={false}>
+                        {strikesData.strikeDist.map((entry, i) => (
+                          <Cell key={i} fill={colors.accent} fillOpacity={entry.isMax ? 1 : 0.35} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </ChartCard>
+
+              </div>
+            )
+          })()}
         </>
       )}
 
