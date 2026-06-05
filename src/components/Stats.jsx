@@ -405,8 +405,7 @@ export default function Stats({ session, theme }) {
     for (const len of allStreaks) {
       if (len < 1 || len > 12) continue
       countsB[len]++
-      if (len === 1) { countsA[1]++ }
-      else { for (let k = 2; k <= len; k++) countsA[k]++ }
+      for (let k = 1; k <= len; k++) countsA[k]++
     }
     const streakDist = Array.from({ length: 12 }, (_, i) => ({
       label: String(i + 1),
