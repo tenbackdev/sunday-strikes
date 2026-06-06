@@ -1053,7 +1053,7 @@ export default function Stats({ session, theme }) {
                   titleBelow={
                     <>
                       <LegendDot color={colors.accent} label="OVERALL" />
-                      <LegendDot color={colors.sub}   label="1-PIN" />
+                      <LegendDot color={colors.sub}   label="SINGLE PIN" />
                       <LegendDot color={colors.third} label="MULTI-PIN" />
                     </>
                   }
