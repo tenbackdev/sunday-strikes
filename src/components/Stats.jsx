@@ -1013,7 +1013,7 @@ export default function Stats({ session, theme }) {
                 {/* Chart 1 — Leave Count: Frequency + Conversion combo */}
                 <ChartCard title="SPARE ATTEMPTS — LEAVE COUNT &amp; CONVERSION RATE">
                   <ResponsiveContainer width="100%" height={220}>
-                    <ComposedChart data={sparesData.leaveDist} margin={{ left: 0, right: 48, top: 4, bottom: 0 }}>
+                    <ComposedChart data={sparesData.leaveDist} margin={{ left: 8, right: 16, top: 4, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke={colors.border} strokeOpacity={0.6} vertical={false} />
                       <XAxis
                         dataKey="label"
@@ -1096,7 +1096,7 @@ export default function Stats({ session, theme }) {
                   }
                 >
                   <ResponsiveContainer width="100%" height={220}>
-                    <ComposedChart data={sparesData.rollingSplitData} margin={{ left: 0, right: 48, top: 4, bottom: 0 }}>
+                    <ComposedChart data={sparesData.rollingSplitData} margin={{ left: 8, right: 16, top: 4, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke={colors.border} strokeOpacity={0.6} vertical={false} />
                       <XAxis
                         dataKey="index"
