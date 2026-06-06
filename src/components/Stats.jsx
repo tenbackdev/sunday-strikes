@@ -631,23 +631,49 @@ export default function Stats({ session, theme }) {
 
     let totalFirstBallPins = 0
     let totalFirstBalls = 0
-    const firstBallBuckets = { '0–5': 0, '6': 0, '7': 0, '8': 0, '9': 0, '10 (X)': 0 }
+    // Use an array to guarantee order — object keys '6','7','8','9' are integer indices
+    // and JS iterates them numerically first, pushing '0–5' after '9'.
+    const FB_LABELS = ['0–5', '6', '7', '8', '9', '10 (X)']
+    const firstBallCounts = [0, 0, 0, 0, 0, 0]
+
+    const bucketPin = (pins) => {
+      totalFirstBallPins += pins
+      totalFirstBalls++
+      if (pins === 10) firstBallCounts[5]++
+      else if (pins === 9) firstBallCounts[4]++
+      else if (pins === 8) firstBallCounts[3]++
+      else if (pins === 7) firstBallCounts[2]++
+      else if (pins === 6) firstBallCounts[1]++
+      else firstBallCounts[0]++
+    }
+    const toPin = (b) => b === 'X' ? 10 : b === '-' ? 0 : parseInt(b, 10)
 
     for (const g of games) {
-      const frames = g.frames ?? []
-      for (let i = 0; i < Math.min(frames.length, 9); i++) {
-        const f = frames[i]
-        const ball1 = f[0]
-        const pins = ball1 === 'X' ? 10 : ball1 === '-' ? 0 : parseInt(ball1, 10)
-        if (!isNaN(pins)) {
-          totalFirstBallPins += pins
-          totalFirstBalls++
-          if (pins === 10) firstBallBuckets['10 (X)']++
-          else if (pins === 9) firstBallBuckets['9']++
-          else if (pins === 8) firstBallBuckets['8']++
-          else if (pins === 7) firstBallBuckets['7']++
-          else if (pins === 6) firstBallBuckets['6']++
-          else firstBallBuckets['0–5']++
+      for (const f of g.frames ?? []) {
+        const balls = f.balls ?? []
+        if (f.frame !== 10) {
+          // Frames 1–9: only balls[0] is a first ball
+          const p = toPin(balls[0])
+          if (!isNaN(p)) bucketPin(p)
+        } else {
+          // 10th frame: each new rack's first ball counts
+          // balls[0] always a first ball
+          const p0 = toPin(balls[0])
+          if (!isNaN(p0)) bucketPin(p0)
+          // balls[1] is a first ball only if balls[0] was a strike (reset to full rack)
+          if (balls[0] === 'X') {
+            const p1 = toPin(balls[1])
+            if (!isNaN(p1)) bucketPin(p1)
+            // balls[2] is a first ball only if balls[1] was also a strike (turkey)
+            if (balls[1] === 'X') {
+              const p2 = toPin(balls[2])
+              if (!isNaN(p2)) bucketPin(p2)
+            }
+          } else if (balls[1] === '/') {
+            // spare in 10th → balls[2] is a fresh rack first ball
+            const p2 = toPin(balls[2])
+            if (!isNaN(p2)) bucketPin(p2)
+          }
         }
       }
     }
@@ -655,7 +681,7 @@ export default function Stats({ session, theme }) {
     const totalPins  = games.reduce((s, g) => s + (g.total_score ?? 0), 0)
     const firstBallAvg = totalFirstBalls > 0 ? (totalFirstBallPins / totalFirstBalls).toFixed(1) : '0'
 
-    const firstBallDist = Object.entries(firstBallBuckets).map(([label, count]) => ({ label, count }))
+    const firstBallDist = FB_LABELS.map((label, i) => ({ label, count: firstBallCounts[i] }))
     const peakFB = Math.max(...firstBallDist.map(d => d.count))
 
     return {
@@ -1154,12 +1180,14 @@ export default function Stats({ session, theme }) {
               <Ribbon stats={pinsData.ribbon} />
 
               <ChartCard title="FIRST BALL PIN COUNT">
+                <div style={{ paddingLeft: 12, paddingRight: 12 }}>
                 <ResponsiveContainer width="100%" height={200}>
-                  <BarChart data={pinsData.firstBallDist} margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
+                  <BarChart data={pinsData.firstBallDist} margin={{ left: 0, right: 8, top: 4, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke={colors.border} strokeOpacity={0.6} vertical={false} />
                     <XAxis
                       dataKey="label"
                       interval={0}
+                      padding={{ left: 16, right: 16 }}
                       tick={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, fill: colors.sub }}
                       axisLine={false}
                       tickLine={false}
@@ -1179,6 +1207,7 @@ export default function Stats({ session, theme }) {
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
+                </div>
               </ChartCard>
 
             </div>
