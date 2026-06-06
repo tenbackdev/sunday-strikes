@@ -156,6 +156,58 @@ export function isConvertedSplit(frame) {
   return b2 === '/'
 }
 
+// Per-game leave analysis: classifies each non-strike frame by pins left after first ball,
+// tracks spare conversion, and estimates missed score opportunity (pins left + bonus ball).
+// careerAvgFB: caller-supplied career first-ball average used to estimate the unthrown fill
+// ball when frame 10's first rack is open (the fill ball is never thrown in that case).
+export function computeLeaveMetrics(frames, careerAvgFB = 7) {
+  let singleAttempts = 0, singleConv = 0
+  let multiAttempts = 0, multiConv = 0
+  // Buckets 1–9, where key 9 = "9 or more pins left" (includes gutter-ball leaves)
+  const leaveCounts = {}
+  for (let i = 1; i <= 9; i++) leaveCounts[i] = { count: 0, converted: 0 }
+  let missedPins = 0
+  let hasEstimate = false
+
+  for (let fi = 0; fi < frames.length; fi++) {
+    const frame = frames[fi]
+    if (!frame?.balls?.length) continue
+    const [b1, b2] = frame.balls
+    const isTenth = frame.frame === 10
+
+    if (b1 === 'X') continue   // strike — no spare attempt this rack
+    if (!b2) continue          // incomplete frame
+
+    const firstCount = b1 === '-' ? 0 : (parseInt(b1, 10) || 0)
+    const pinsLeft = 10 - firstCount
+    const bucketKey = Math.min(pinsLeft, 9)
+    if (bucketKey < 1) continue
+
+    const isConverted = b2 === '/'
+    leaveCounts[bucketKey].count++
+    if (isConverted) leaveCounts[bucketKey].converted++
+
+    if (bucketKey === 1) { singleAttempts++; if (isConverted) singleConv++ }
+    else                 { multiAttempts++;  if (isConverted) multiConv++  }
+
+    if (!isConverted) {
+      const secondCount = b2 === '-' ? 0 : (parseInt(b2, 10) || 0)
+      const pinsAfterSecond = Math.max(0, pinsLeft - secondCount)
+      if (!isTenth) {
+        const nb = frames[fi + 1]?.balls?.[0]
+        const nextBall0 = nb === 'X' ? 10 : nb === '-' ? 0 : (parseInt(nb, 10) || 0)
+        missedPins += pinsAfterSecond + nextBall0
+      } else {
+        // Fill ball never thrown — use career average as proxy
+        missedPins += pinsAfterSecond + careerAvgFB
+        hasEstimate = true
+      }
+    }
+  }
+
+  return { singleAttempts, singleConv, multiAttempts, multiConv, leaveCounts, missedPins, hasEstimate }
+}
+
 export function normalizeFrames(frames) {
   if (!frames?.length) return frames ?? []
   return frames.map(frame => {
