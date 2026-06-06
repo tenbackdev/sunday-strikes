@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
-import { computeStats } from '../lib/parseGame'
+import { computeStats, computeLeaveMetrics } from '../lib/parseGame'
 import {
   ComposedChart, BarChart,
   Area, Line, Bar, Cell,
@@ -41,6 +41,7 @@ function getChartColors() {
     sub:    s.getPropertyValue('--sub').trim()    || '#9E8B6E',
     border: s.getPropertyValue('--border').trim() || '#DECCA2',
     text:   s.getPropertyValue('--text').trim()   || '#2C1810',
+    third:  '#4A7FA5',
   }
 }
 
@@ -203,15 +204,80 @@ function RunTooltip({ active, payload, label }) {
   )
 }
 
-function ChartCard({ title, titleRight, children }) {
+function LegendDot({ color, label }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+      <div style={{ width: 6, height: 6, borderRadius: '50%', background: color }} />
+      <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8, fontWeight: 700, letterSpacing: '0.05em', color: 'var(--sub)' }}>{label}</span>
+    </div>
+  )
+}
+
+function LeaveComboTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null
+  const count    = payload.find(p => p.dataKey === 'count')?.value
+  const convRate = payload.find(p => p.dataKey === 'convRate')?.value
+  return (
+    <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', fontSize: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
+      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: 'var(--text)', fontSize: 10, marginBottom: 4 }}>{label} PIN{label === '1' ? '' : 'S'} LEFT</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 3, fontFamily: "'JetBrains Mono', monospace", fontSize: 11 }}>
+        <span style={{ color: 'var(--sub)' }}>Attempts <span style={{ color: 'var(--text)', fontWeight: 700 }}>{count}</span></span>
+        {convRate != null && <span style={{ color: 'var(--sub)' }}>Converted <span style={{ color: 'var(--accent)', fontWeight: 700 }}>{convRate}%</span></span>}
+        {convRate == null && <span style={{ color: 'var(--sub)' }}>Converted <span style={{ color: 'var(--sub)', fontWeight: 700 }}>—</span></span>}
+      </div>
+    </div>
+  )
+}
+
+function RollingConvTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null
+  const overall   = payload.find(p => p.dataKey === 'overall')?.value
+  const singlePin = payload.find(p => p.dataKey === 'singlePin')?.value
+  const multiPin  = payload.find(p => p.dataKey === 'multiPin')?.value
+  return (
+    <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', fontSize: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
+      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: 'var(--sub)', fontSize: 10, marginBottom: 4 }}>GAME {label}</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 3, fontFamily: "'JetBrains Mono', monospace", fontSize: 11 }}>
+        {overall   != null && <span style={{ color: 'var(--sub)' }}>Overall   <span style={{ color: 'var(--accent)', fontWeight: 700 }}>{overall}%</span></span>}
+        {singlePin != null && <span style={{ color: 'var(--sub)' }}>1-pin     <span style={{ color: 'var(--text)', fontWeight: 700 }}>{singlePin}%</span></span>}
+        {multiPin  != null && <span style={{ color: 'var(--sub)' }}>Multi-pin <span style={{ color: '#4A7FA5', fontWeight: 700 }}>{multiPin}%</span></span>}
+      </div>
+    </div>
+  )
+}
+
+function RollingSplitTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null
+  const rate         = payload.find(p => p.dataKey === 'splitConvRate')?.value
+  const windowSplits = payload.find(p => p.dataKey === 'windowSplits')?.value
+  return (
+    <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', fontSize: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
+      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: 'var(--sub)', fontSize: 10, marginBottom: 4 }}>GAME {label}</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 3, fontFamily: "'JetBrains Mono', monospace", fontSize: 11 }}>
+        {rate != null
+          ? <span style={{ color: 'var(--sub)' }}>Split conv <span style={{ color: 'var(--accent)', fontWeight: 700 }}>{rate}%</span></span>
+          : <span style={{ color: 'var(--sub)' }}>No splits in window</span>}
+        {windowSplits > 0 && <span style={{ color: 'var(--sub)' }}>Splits (window) <span style={{ color: 'var(--text)', fontWeight: 700 }}>{windowSplits}</span></span>}
+      </div>
+    </div>
+  )
+}
+
+
+function ChartCard({ title, titleRight, titleBelow, children }) {
   return (
     <div style={{ border: '1px solid var(--border)', borderRadius: 12, background: 'var(--card)', paddingTop: 14, paddingBottom: 10, overflow: 'hidden' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, paddingLeft: 16, paddingRight: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: titleBelow ? 4 : 10, paddingLeft: 16, paddingRight: 16 }}>
         <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', color: 'var(--sub)' }}>
           {title}
         </div>
         {titleRight}
       </div>
+      {titleBelow && (
+        <div style={{ display: 'flex', gap: 12, marginBottom: 10, paddingLeft: 16, paddingRight: 16 }}>
+          {titleBelow}
+        </div>
+      )}
       {children}
     </div>
   )
@@ -455,21 +521,106 @@ export default function Stats({ session, theme }) {
     if (!games.length) return null
     const allStats = games.map(g => computeStats(g.frames ?? []))
 
-    const totalSpares    = allStats.reduce((s, x) => s + x.spares, 0)
-    const totalOpens     = allStats.reduce((s, x) => s + x.opens,  0)
-    const totalSplits    = allStats.reduce((s, x) => s + x.splits, 0)
-    // Spare opportunities = non-strike frames in frames 1–9, plus 10th-frame second ball if first wasn't a strike
-    // Approximation: opens + spares (each was an opportunity)
-    const spareOpps  = totalSpares + totalOpens
-    const convRate   = spareOpps > 0 ? Math.round((totalSpares / spareOpps) * 100) : 0
+    // Career first-ball average (pre-pass) — used as proxy for the unthrown fill ball
+    // when frame 10's first rack is open
+    let fbTotal = 0, fbCount = 0
+    for (const g of games) {
+      for (const f of g.frames ?? []) {
+        if (f.balls?.[0] !== 'X') {
+          const p = f.balls?.[0] === '-' ? 0 : parseInt(f.balls?.[0], 10) || 0
+          fbTotal += p; fbCount++
+        }
+      }
+    }
+    const careerAvgFB = fbCount > 0 ? fbTotal / fbCount : 7
+
+    // Per-game leave metrics (indexed parallel to games[])
+    const perGameLeave = games.map(g => computeLeaveMetrics(g.frames ?? [], careerAvgFB))
+
+    // Aggregate leave metrics across all games
+    let singleAttempts = 0, singleConv = 0, multiAttempts = 0, multiConv = 0
+    const aggrLeave = {}
+    for (let i = 1; i <= 9; i++) aggrLeave[i] = { count: 0, converted: 0 }
+    for (const lm of perGameLeave) {
+      singleAttempts += lm.singleAttempts; singleConv += lm.singleConv
+      multiAttempts  += lm.multiAttempts;  multiConv  += lm.multiConv
+      for (let i = 1; i <= 9; i++) {
+        aggrLeave[i].count     += lm.leaveCounts[i].count
+        aggrLeave[i].converted += lm.leaveCounts[i].converted
+      }
+    }
+
+    const totalSpares = allStats.reduce((s, x) => s + x.spares, 0)
+    const totalOpens  = allStats.reduce((s, x) => s + x.opens,  0)
+    const totalSplits = allStats.reduce((s, x) => s + x.splits, 0)
+    const totalConv   = allStats.reduce((s, x) => s + x.conv,   0)
+    const spareOpps   = totalSpares + totalOpens
+    const convRate      = spareOpps > 0     ? Math.round((totalSpares / spareOpps)    * 100) : 0
+    const splitConvRate = totalSplits > 0   ? Math.round((totalConv   / totalSplits)  * 100) : 0
+    const singlePinRate = singleAttempts > 0 ? Math.round((singleConv  / singleAttempts) * 100) : 0
+    const multiPinRate  = multiAttempts  > 0 ? Math.round((multiConv   / multiAttempts)  * 100) : 0
+
+    // Chart 1 — Leave distribution + conversion combo (fixed buckets 1–9+)
+    const leaveDist = Array.from({ length: 9 }, (_, i) => {
+      const key = i + 1
+      const { count, converted } = aggrLeave[key]
+      return {
+        label: key === 9 ? '9+' : String(key),
+        count,
+        convRate: count > 0 ? Math.round((converted / count) * 100) : null,
+      }
+    })
+
+    // Chronological order (oldest first) for all time-series charts
+    const sorted = [...games].reverse()
+    const N = 10
+
+    // Chart 2 — Rolling spare conversion: overall / single-pin / multi-pin
+    const rollingConvData = sorted.map((_, i) => {
+      const wStart = Math.max(0, i - N + 1)
+      let wSp = 0, wOp = 0, wSA = 0, wSC = 0, wMA = 0, wMC = 0
+      for (let wi = wStart; wi <= i; wi++) {
+        const gi = games.length - 1 - wi
+        wSp += allStats[gi].spares; wOp += allStats[gi].opens
+        wSA += perGameLeave[gi].singleAttempts; wSC += perGameLeave[gi].singleConv
+        wMA += perGameLeave[gi].multiAttempts;  wMC += perGameLeave[gi].multiConv
+      }
+      const wOpps = wSp + wOp
+      return {
+        index:     i + 1,
+        overall:   wOpps > 0 ? Math.round((wSp / wOpps) * 100) : null,
+        singlePin: wSA  > 0  ? Math.round((wSC / wSA)   * 100) : null,
+        multiPin:  wMA  > 0  ? Math.round((wMC / wMA)   * 100) : null,
+      }
+    })
+
+    // Chart 3 — Rolling split conversion rate + per-window split count
+    const hasSplits = totalSplits > 0
+    const rollingSplitData = sorted.map((_, i) => {
+      const wStart = Math.max(0, i - N + 1)
+      let wSplits = 0, wConv = 0
+      for (let wi = wStart; wi <= i; wi++) {
+        const wgi = games.length - 1 - wi
+        wSplits += allStats[wgi].splits; wConv += allStats[wgi].conv
+      }
+      return {
+        index:         i + 1,
+        splitConvRate: wSplits > 0 ? Math.round((wConv / wSplits) * 100) : null,
+        windowSplits:  wSplits,
+      }
+    })
 
     return {
       ribbon: [
-        { label: 'CONV RATE', value: `${convRate}%` },
-        { label: 'AVG SPARES', value: games.length ? (totalSpares / games.length).toFixed(1) : '0' },
-        { label: 'OPEN FRAMES', value: games.length ? (totalOpens / games.length).toFixed(1) : '0' },
-        { label: 'SPLITS', value: totalSplits },
+        { label: 'CONV RATE',    value: `${convRate}%` },
+        { label: 'SINGLE-PIN %', value: `${singlePinRate}%` },
+        { label: 'MULTI-PIN %',  value: `${multiPinRate}%` },
+        { label: 'SPLIT CONV %', value: `${splitConvRate}%` },
       ],
+      leaveDist,
+      rollingConvData,
+      rollingSplitData,
+      hasSplits,
     }
   }, [games])
 
@@ -853,11 +1004,143 @@ export default function Stats({ session, theme }) {
       {!isLoading && statsTab === 'spares' && (
         <>
           {!hasGames && <EmptyState />}
-          {hasGames && sparesData && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}>
-              <Ribbon stats={sparesData.ribbon} />
-            </div>
-          )}
+          {hasGames && sparesData && (() => {
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}>
+
+                <Ribbon stats={sparesData.ribbon} />
+
+                {/* Chart 1 — Leave Count: Frequency + Conversion combo */}
+                <ChartCard title="SPARE ATTEMPTS — LEAVE COUNT &amp; CONVERSION RATE">
+                  <ResponsiveContainer width="100%" height={220}>
+                    <ComposedChart data={sparesData.leaveDist} margin={{ left: 0, right: 48, top: 4, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={colors.border} strokeOpacity={0.6} vertical={false} />
+                      <XAxis
+                        dataKey="label"
+                        interval={0}
+                        tick={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fill: colors.sub }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        yAxisId="left"
+                        allowDecimals={false}
+                        tick={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fill: colors.sub }}
+                        axisLine={false}
+                        tickLine={false}
+                        width={30}
+                      />
+                      <YAxis
+                        yAxisId="right"
+                        orientation="right"
+                        domain={[0, 100]}
+                        tickFormatter={v => `${v}%`}
+                        tick={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fill: colors.sub }}
+                        axisLine={false}
+                        tickLine={false}
+                        width={40}
+                      />
+                      <Tooltip content={<LeaveComboTooltip />} />
+                      <Bar yAxisId="left" dataKey="count" fill={colors.accent} fillOpacity={0.45} radius={[3, 3, 0, 0]} isAnimationActive={false} />
+                      <Line yAxisId="right" type="natural" dataKey="convRate" stroke={colors.accent} strokeWidth={2} dot={{ r: 3, fill: colors.accent, strokeWidth: 0 }} activeDot={{ r: 4, fill: colors.accent, strokeWidth: 0 }} connectNulls={true} isAnimationActive={false} />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </ChartCard>
+
+                {/* Chart 2 — Rolling Spare Conversion: Overall / Single-Pin / Multi-Pin */}
+                <ChartCard
+                  title="ROLLING 10-GAME SPARE CONVERSION"
+                  titleBelow={
+                    <>
+                      <LegendDot color={colors.accent} label="OVERALL" />
+                      <LegendDot color={colors.sub}   label="1-PIN" />
+                      <LegendDot color={colors.third} label="MULTI-PIN" />
+                    </>
+                  }
+                >
+                  <ResponsiveContainer width="100%" height={220}>
+                    <ComposedChart data={sparesData.rollingConvData} margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={colors.border} strokeOpacity={0.6} vertical={false} />
+                      <XAxis
+                        dataKey="index"
+                        padding={{ left: 12, right: 12 }}
+                        tick={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fill: colors.sub }}
+                        axisLine={false}
+                        tickLine={false}
+                        interval="preserveStartEnd"
+                      />
+                      <YAxis
+                        domain={[0, 100]}
+                        tickFormatter={v => `${v}%`}
+                        tick={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fill: colors.sub }}
+                        axisLine={false}
+                        tickLine={false}
+                        width={40}
+                      />
+                      <Tooltip content={<RollingConvTooltip />} />
+                      <Line type="monotone" dataKey="overall"   stroke={colors.accent} strokeWidth={2.5} dot={false} activeDot={{ r: 4, fill: colors.accent, strokeWidth: 0 }} connectNulls={false} isAnimationActive={false} />
+                      <Line type="monotone" dataKey="singlePin" stroke={colors.sub}   strokeWidth={1.5} strokeDasharray="5 3" dot={false} connectNulls={false} isAnimationActive={false} />
+                      <Line type="monotone" dataKey="multiPin"  stroke={colors.third} strokeWidth={1.5} strokeDasharray="2 4" dot={false} connectNulls={false} isAnimationActive={false} />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </ChartCard>
+
+                {/* Chart 3 — Rolling Split Conversion Rate + window split count */}
+                <ChartCard
+                  title="ROLLING 10-GAME SPLIT CONVERSION"
+                  titleBelow={
+                    <>
+                      <LegendDot color={colors.accent} label="CONV %" />
+                      <LegendDot color={colors.sub}    label="SPLITS IN WINDOW" />
+                    </>
+                  }
+                >
+                  <ResponsiveContainer width="100%" height={220}>
+                    <ComposedChart data={sparesData.rollingSplitData} margin={{ left: 0, right: 48, top: 4, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={colors.border} strokeOpacity={0.6} vertical={false} />
+                      <XAxis
+                        dataKey="index"
+                        padding={{ left: 12, right: 12 }}
+                        tick={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fill: colors.sub }}
+                        axisLine={false}
+                        tickLine={false}
+                        interval="preserveStartEnd"
+                      />
+                      <YAxis
+                        yAxisId="left"
+                        domain={[0, 100]}
+                        tickFormatter={v => `${v}%`}
+                        tick={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fill: colors.sub }}
+                        axisLine={false}
+                        tickLine={false}
+                        width={40}
+                      />
+                      <YAxis
+                        yAxisId="right"
+                        orientation="right"
+                        allowDecimals={false}
+                        tick={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fill: colors.sub }}
+                        axisLine={false}
+                        tickLine={false}
+                        width={30}
+                      />
+                      <Tooltip content={<RollingSplitTooltip />} />
+                      <Bar yAxisId="right" dataKey="windowSplits" fill={colors.sub} fillOpacity={0.2} radius={[3, 3, 0, 0]} isAnimationActive={false} />
+                      {sparesData.hasSplits
+                        ? <Line yAxisId="left" type="monotone" dataKey="splitConvRate" stroke={colors.accent} strokeWidth={2} dot={false} activeDot={{ r: 4, fill: colors.accent, strokeWidth: 0 }} connectNulls={false} isAnimationActive={false} />
+                        : null
+                      }
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                  {!sparesData.hasSplits && (
+                    <div style={{ textAlign: 'center', paddingBottom: 16, fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: 'var(--sub)' }}>No splits recorded</div>
+                  )}
+                </ChartCard>
+
+
+              </div>
+            )
+          })()}
         </>
       )}
 
