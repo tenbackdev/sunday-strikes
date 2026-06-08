@@ -45,6 +45,11 @@ function getChartColors() {
   }
 }
 
+function toLocalDateStr(isoStr) {
+  const d = new Date(isoStr)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 function fmtDate(dateStr) {
   const [y, m, d] = dateStr.split('-').map(Number)
   return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
@@ -365,7 +370,7 @@ export default function Stats({ session, theme }) {
   const byDay = useMemo(() => {
     const map = {}
     for (const g of games) {
-      const day = g.played_at.slice(0, 10)
+      const day = toLocalDateStr(g.played_at)
       if (!map[day]) map[day] = []
       map[day].push(g.total_score ?? 0)
     }
@@ -489,7 +494,7 @@ export default function Stats({ session, theme }) {
     // Strikes per session — high / avg / low by day
     const dayMap = {}
     for (let i = 0; i < games.length; i++) {
-      const day = games[i].played_at.slice(0, 10)
+      const day = toLocalDateStr(games[i].played_at)
       if (!dayMap[day]) dayMap[day] = []
       dayMap[day].push(allStats[i].strikes)
     }
