@@ -359,10 +359,11 @@ export default function Stats({ session, theme }) {
   const overviewRibbon = useMemo(() => {
     if (!games.length) return null
     const scores = games.map(g => g.total_score ?? 0)
+    const perfectCount = games.filter(g => g.total_score === 300).length
     return [
       { label: 'GAMES',   value: games.length },
       { label: 'AVG',     value: Math.round(scores.reduce((s, v) => s + v, 0) / scores.length) },
-      { label: 'BEST',    value: Math.max(...scores), amber: Math.max(...scores) === 300 },
+      { label: 'BEST',    value: Math.max(...scores), amber: Math.max(...scores) === 300, badge: perfectCount > 1 ? perfectCount : null },
       { label: 'STRIKES', value: games.reduce((s, g) => s + computeStats(g.frames ?? []).strikes, 0) },
     ]
   }, [games])
@@ -760,8 +761,16 @@ export default function Stats({ session, theme }) {
                 <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', background: 'var(--card)', boxShadow: '0 1px 2px rgba(60,40,15,0.05)' }}>
                   {overviewRibbon.map((r, i) => (
                     <div key={r.label} style={{ flex: 1, padding: '10px 0 11px', textAlign: 'center', borderLeft: i ? '1px solid var(--border)' : 'none' }}>
-                      <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 22, letterSpacing: '-0.02em', color: r.amber ? AMBER : 'var(--text)', lineHeight: 1 }}>
-                        {r.value}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, lineHeight: 1 }}>
+                        <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 22, letterSpacing: '-0.02em', color: r.amber ? AMBER : 'var(--text)' }}>
+                          {r.value}
+                        </span>
+                        {r.badge && (
+                          <span title={`${r.badge} perfect games logged`} style={{ display: 'inline-flex', alignItems: 'center', gap: 2, fontFamily: "'JetBrains Mono', monospace", fontSize: 9.5, fontWeight: 700, color: AMBER, background: 'rgba(190,124,42,0.14)', border: '1px solid rgba(190,124,42,0.32)', borderRadius: 999, padding: '1px 5px 1px 4px' }}>
+                            <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.3 6.9.7-5.1 4.6 1.4 6.8L12 17.8 5.9 20.4l1.4-6.8L2.2 9l6.9-.7z" /></svg>
+                            {r.badge}
+                          </span>
+                        )}
                       </div>
                       <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8.5, fontWeight: 700, letterSpacing: '0.1em', color: 'var(--sub)', marginTop: 4 }}>{r.label}</div>
                     </div>
