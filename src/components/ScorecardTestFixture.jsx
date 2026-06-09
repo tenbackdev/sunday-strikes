@@ -25,6 +25,7 @@ export default function ScorecardTestFixture() {
       {/* Simulates the modal's scrollable container */}
       <div
         data-testid="modal-scroll"
+        data-modal-scroll
         style={{
           width: '100%',
           maxWidth: 448,

@@ -1,5 +1,5 @@
 import { createPortal } from 'react-dom'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { isConvertedSplit } from '../lib/parseGame'
 
 // ── Ball mark (display only) ─────────────────────────────────────────────────
@@ -406,12 +406,29 @@ export function FrameGrid({ frames }) {
 
 // ── Editable frame grid ──────────────────────────────────────────────────────
 
+// Height the fixed keypad occupies, used to pad the scroll container so content
+// behind it remains reachable.
+const KEYPAD_PANEL_H = 210
+
 export function EditableFrameGrid({ frames, onChange }) {
   const cachedFillBallRef = useRef(null)
   const [focusedBall, setFocusedBall] = useState(null)
   const blurTimerRef = useRef(null)
   const containerRef = useRef(null)
   const borderStyle = '1px solid color-mix(in srgb, var(--border) 60%, transparent)'
+
+  // When keypad is open, push the scroll container down so content behind the
+  // fixed panel can still be scrolled into view.
+  useEffect(() => {
+    const scrollEl = containerRef.current?.closest('[data-modal-scroll]')
+    if (!scrollEl) return
+    if (focusedBall !== null) {
+      scrollEl.style.paddingBottom = `${KEYPAD_PANEL_H}px`
+    } else {
+      scrollEl.style.paddingBottom = ''
+    }
+    return () => { scrollEl.style.paddingBottom = '' }
+  }, [focusedBall])
 
   function applyAutoSpare(balls, ballIdx, val) {
     if (ballIdx === 1 && val !== '/' && val !== 'X' && val !== '-') {
@@ -698,14 +715,15 @@ export function EditableFrameGrid({ frames, onChange }) {
           style={{
             position: 'fixed',
             bottom: 0,
-            left: 0,
-            right: 0,
+            left: '50%',
+            width: '100%',
+            maxWidth: '448px',
             zIndex: 9999,
             padding: '8px 12px',
             paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
             background: 'var(--card)',
             borderTop: '1px solid var(--border)',
-            transform: focusedBall !== null ? 'translateY(0)' : 'translateY(100%)',
+            transform: focusedBall !== null ? 'translateX(-50%) translateY(0)' : 'translateX(-50%) translateY(100%)',
             transition: 'transform 200ms ease',
           }}
         >

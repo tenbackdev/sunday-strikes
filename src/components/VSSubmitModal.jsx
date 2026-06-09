@@ -665,6 +665,7 @@ export default function VSSubmitModal({ session, onClose, onSaved }) {
       style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)' }}
     >
       <div
+        data-modal-scroll
         className="w-full max-w-md rounded-t-2xl p-5 sm:rounded-2xl max-h-[92vh] overflow-y-auto modal-enter modal-grain"
         style={{ background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-float)' }}
       >
