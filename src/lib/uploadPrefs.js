@@ -3,7 +3,8 @@ const OPP_KEY = 'ss_opponent_pref'
 const OPP_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
 function today() {
-  return new Date().toISOString().slice(0, 10)
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 export function loadUploadPrefs() {

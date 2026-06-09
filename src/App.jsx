@@ -2,8 +2,13 @@ import { useEffect, useState } from 'react'
 import { supabase } from './lib/supabase'
 import AuthScreen from './components/Auth'
 import Layout from './components/Layout'
+import ScorecardTestFixture from './components/ScorecardTestFixture'
 
 function App() {
+  if (new URLSearchParams(window.location.search).get('playwright') === '1') {
+    return <ScorecardTestFixture />
+  }
+
   const [session, setSession] = useState(null)
   const [loading, setLoading] = useState(true)
 

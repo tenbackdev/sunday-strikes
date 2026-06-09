@@ -166,17 +166,28 @@ function ScorecardStep({ title, playerLabel, setPlayerLabel, imageFile, setImage
       <p className="mb-3 text-sm font-semibold" style={{ color: 'var(--text)' }}>{title}</p>
 
       {previewUrl ? (
-        <div className="relative mb-3">
-          <img src={previewUrl} alt="Scorecard" className="h-36 w-full rounded-xl object-cover" />
-          <button
-            onClick={() => { setPreviewUrl(null); setImageFile(null); setPhase('input'); setParsedData(null) }}
-            className="absolute right-2 top-2 rounded-full p-1 text-white transition-colors"
-            style={{ background: 'rgba(0,0,0,0.5)' }}
-          >
-            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
+        <div className="mb-3">
+          <div className="relative">
+            <img src={previewUrl} alt="Scorecard" className="h-36 w-full rounded-xl object-cover" />
+            <button
+              onClick={() => { setPreviewUrl(null); setImageFile(null); setPhase('input'); setParsedData(null) }}
+              className="absolute right-2 top-2 rounded-full p-1 text-white transition-colors"
+              style={{ background: 'rgba(0,0,0,0.5)' }}
+            >
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+          {isReview && (
+            <button
+              onClick={() => { setPhase('input'); setParsedData(null); setPreviewUrl(null); setImageFile(null) }}
+              className="mt-1.5 text-xs"
+              style={{ color: 'var(--sub)', textDecoration: 'underline' }}
+            >
+              Retake photo
+            </button>
+          )}
         </div>
       ) : (
         <div className="mb-3 grid grid-cols-2 gap-2">
@@ -223,7 +234,7 @@ function ScorecardStep({ title, playerLabel, setPlayerLabel, imageFile, setImage
         </div>
       )}
 
-      {!isReview ? (
+      {!isReview && (
         <button
           onClick={handleParse}
           disabled={isParsing || !imageFile}
@@ -231,14 +242,6 @@ function ScorecardStep({ title, playerLabel, setPlayerLabel, imageFile, setImage
           style={{ background: 'var(--accent)', color: 'var(--acc-text)' }}
         >
           {isParsing ? 'Parsing photo…' : 'Parse Score'}
-        </button>
-      ) : (
-        <button
-          onClick={() => { setPhase('input'); setParsedData(null); setPreviewUrl(null); setImageFile(null) }}
-          className="w-full rounded-xl py-2 text-sm font-medium transition-colors"
-          style={{ border: '1px solid var(--border)', color: 'var(--sub)' }}
-        >
-          Retake Photo
         </button>
       )}
     </div>
@@ -307,17 +310,28 @@ function CombinedScorecardStep({ myPlayerLabel, setMyPlayerLabel, myParsedData, 
       <p className="mb-3 text-sm font-semibold" style={{ color: 'var(--text)' }}>Both scorecards — one photo</p>
 
       {previewUrl ? (
-        <div className="relative mb-3">
-          <img src={previewUrl} alt="Scorecard" className="h-36 w-full rounded-xl object-cover" />
-          <button
-            onClick={() => { setPreviewUrl(null); setImageFile(null); setPhase('input'); setMyParsedData(null); setOppParsedData(null) }}
-            className="absolute right-2 top-2 rounded-full p-1 text-white"
-            style={{ background: 'rgba(0,0,0,0.5)' }}
-          >
-            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
+        <div className="mb-3">
+          <div className="relative">
+            <img src={previewUrl} alt="Scorecard" className="h-36 w-full rounded-xl object-cover" />
+            <button
+              onClick={() => { setPreviewUrl(null); setImageFile(null); setPhase('input'); setMyParsedData(null); setOppParsedData(null) }}
+              className="absolute right-2 top-2 rounded-full p-1 text-white"
+              style={{ background: 'rgba(0,0,0,0.5)' }}
+            >
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+          {isReview && (
+            <button
+              onClick={() => { setPhase('input'); setMyParsedData(null); setOppParsedData(null); setPreviewUrl(null); setImageFile(null) }}
+              className="mt-1.5 text-xs"
+              style={{ color: 'var(--sub)', textDecoration: 'underline' }}
+            >
+              Retake photo
+            </button>
+          )}
         </div>
       ) : (
         <div className="mb-3 grid grid-cols-2 gap-2">
@@ -375,7 +389,7 @@ function CombinedScorecardStep({ myPlayerLabel, setMyPlayerLabel, myParsedData, 
         </div>
       )}
 
-      {!isReview ? (
+      {!isReview && (
         <button
           onClick={handleParse}
           disabled={isParsing || !imageFile}
@@ -383,14 +397,6 @@ function CombinedScorecardStep({ myPlayerLabel, setMyPlayerLabel, myParsedData, 
           style={{ background: 'var(--accent)', color: 'var(--acc-text)' }}
         >
           {isParsing ? 'Parsing both scores…' : 'Parse Both Scores'}
-        </button>
-      ) : (
-        <button
-          onClick={() => { setPhase('input'); setMyParsedData(null); setOppParsedData(null); setPreviewUrl(null); setImageFile(null) }}
-          className="w-full rounded-xl py-2 text-sm font-medium transition-colors"
-          style={{ border: '1px solid var(--border)', color: 'var(--sub)' }}
-        >
-          Retake Photo
         </button>
       )}
     </div>

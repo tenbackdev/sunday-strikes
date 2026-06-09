@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom'
 import { useRef, useState } from 'react'
 import { isConvertedSplit } from '../lib/parseGame'
 
@@ -47,7 +48,7 @@ export function EditableBallInput({ value, onChange, disabled, onFocus, onBlur, 
               const grid = inputRef.current?.closest('[data-frame-grid]')
               const all = Array.from(grid?.querySelectorAll('[data-ball-input]:not([disabled])') ?? [])
               const idx = all.indexOf(inputRef.current)
-              if (idx >= 0 && idx < all.length - 1) all[idx + 1].focus()
+              if (idx >= 0 && idx < all.length - 1) all[idx + 1].focus({ preventScroll: true })
             })
           }
         }
@@ -119,12 +120,9 @@ function BowlingKeypad({
 
   return (
     <div
-      className="overflow-hidden"
       style={{
-        maxHeight: visible ? '196px' : '0',
-        marginTop: visible ? '8px' : '0',
         opacity: visible ? 1 : 0,
-        transition: 'max-height 210ms ease, opacity 160ms ease, margin-top 180ms ease',
+        transition: 'opacity 150ms ease',
       }}
     >
       <div className="space-y-1.5">
@@ -162,6 +160,7 @@ function BowlingKeypad({
             return (
               <button
                 key={d}
+                data-keypad-key={d}
                 onMouseDown={e => { e.preventDefault(); if (!off) onKey(d) }}
                 className={`${btn} h-10 text-sm`}
                 style={{
@@ -180,6 +179,7 @@ function BowlingKeypad({
         {/* Special keys row: X / − ⌫ */}
         <div className="grid grid-cols-4 gap-1">
           <button
+            data-keypad-key="X"
             onMouseDown={e => { e.preventDefault(); if (!xDisabled) onKey('X') }}
             className={`${btn} h-11 text-base`}
             style={{
@@ -239,6 +239,7 @@ function BowlingKeypad({
             {isSplit ? '● SPLIT' : '○ SPLIT'}
           </button>
           <button
+            data-keypad-done
             onMouseDown={e => { e.preventDefault(); onDone() }}
             className={`${btn} h-11 text-sm`}
             style={{ background: 'var(--text)', color: 'var(--card)', letterSpacing: '0.06em' }}
@@ -516,7 +517,7 @@ export function EditableFrameGrid({ frames, onChange }) {
       const currentEl = containerRef.current.querySelector(`[data-ball-fi="${fi}"][data-ball-bidx="${ballIdx}"]:not([disabled])`)
       const currentIdx = currentEl ? inputs.indexOf(currentEl) : -1
       if (currentIdx >= 0 && currentIdx < inputs.length - 1) {
-        inputs[currentIdx + 1].focus()
+        inputs[currentIdx + 1].focus({ preventScroll: true })
       }
     })
   }
@@ -535,7 +536,7 @@ export function EditableFrameGrid({ frames, onChange }) {
   function focusFrame(fi) {
     requestAnimationFrame(() => {
       const firstInput = containerRef.current?.querySelector(`[data-ball-fi="${fi}"][data-ball-bidx="0"]:not([disabled])`)
-      firstInput?.focus()
+      firstInput?.focus({ preventScroll: true })
     })
   }
 
@@ -692,21 +693,40 @@ export function EditableFrameGrid({ frames, onChange }) {
         </div>
       </div>
 
-      <BowlingKeypad
-        visible={focusedBall !== null}
-        isSplit={isSplit}
-        slashDisabled={slashDisabled}
-        xDisabled={xDisabled}
-        maxDigit={maxDigit}
-        frameNum={frameNum}
-        ballNum={ballNum}
-        onKey={handleKeypadKey}
-        onBackspace={handleKeypadBackspace}
-        onToggleSplit={() => focusedBall && toggleSplit(focusedBall.fi)}
-        onDone={handleKeypadDone}
-        onPrev={handleKeypadPrev}
-        onNext={handleKeypadNext}
-      />
+      {createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            zIndex: 9999,
+            padding: '8px 12px',
+            paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
+            background: 'var(--card)',
+            borderTop: '1px solid var(--border)',
+            transform: focusedBall !== null ? 'translateY(0)' : 'translateY(100%)',
+            transition: 'transform 200ms ease',
+          }}
+        >
+          <BowlingKeypad
+            visible={focusedBall !== null}
+            isSplit={isSplit}
+            slashDisabled={slashDisabled}
+            xDisabled={xDisabled}
+            maxDigit={maxDigit}
+            frameNum={frameNum}
+            ballNum={ballNum}
+            onKey={handleKeypadKey}
+            onBackspace={handleKeypadBackspace}
+            onToggleSplit={() => focusedBall && toggleSplit(focusedBall.fi)}
+            onDone={handleKeypadDone}
+            onPrev={handleKeypadPrev}
+            onNext={handleKeypadNext}
+          />
+        </div>,
+        document.body
+      )}
     </div>
   )
 }

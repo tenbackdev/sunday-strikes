@@ -124,6 +124,19 @@ VITE_GEMINI_API_KEY=
 - **Score distribution buckets must always be pre-defined and complete.** Do not generate buckets dynamically from `min → max` of actual data — that causes gaps when no scores fall in a range. Always use this fixed set: one `"< 100"` bucket for all scores 0–99, then 20-point buckets from 100–119 through 280–299, then a dedicated `"300"` bucket for perfect games. Every bucket must always appear in the chart data (with count 0 if empty) so the x-axis is never missing a range.
 - **Chart whitespace:** All Recharts chart components (`BarChart`, `LineChart`, etc.) must use a non-negative left margin. Use `margin={{ left: 0, right: 16, top: 4, bottom: 0 }}` as the minimum baseline. Never use a negative `left` margin value — it causes the chart to clip against the container edge.
 
+### Date & Time Rules
+- **Always use local time for display and date grouping.** `played_at` and similar fields are stored as UTC ISO strings in Supabase. Never extract a display date by slicing the raw string (e.g. `.slice(0, 10)`) — that returns the UTC date, which is wrong for users in any timezone offset from UTC.
+- **To get a local YYYY-MM-DD key** from an ISO timestamp, use this pattern (copy it; do not reinvent):
+  ```js
+  function toLocalDateStr(isoStr) {
+    const d = new Date(isoStr)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }
+  ```
+- **`new Date(isoStr)` is always safe for display** — `.toLocaleDateString()`, `.toLocaleTimeString()`, `.toDateString()`, `.getFullYear()`, `.getMonth()`, `.getDate()` all return local values.
+- **Writing timestamps to the DB** (`new Date(localInput).toISOString()`) is correct — store UTC, display local.
+- **Daily expiry keys** (e.g. in `uploadPrefs.js`) must use the local date, not `new Date().toISOString().slice(0, 10)`.
+
 ### Hard Rules
 - Do not add sections, features, or content not in the reference
 - Do not "improve" a reference design — match it

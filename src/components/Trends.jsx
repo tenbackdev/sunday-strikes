@@ -27,6 +27,11 @@ function getChartColors() {
   }
 }
 
+function toLocalDateStr(isoStr) {
+  const d = new Date(isoStr)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 function fmtDate(dateStr) {
   const [y, m, d] = dateStr.split('-').map(Number)
   return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
@@ -140,7 +145,7 @@ export default function Trends({ session, theme }) {
   const byDay = useMemo(() => {
     const map = {}
     for (const g of games) {
-      const day = g.played_at.slice(0, 10)
+      const day = toLocalDateStr(g.played_at)
       if (!map[day]) map[day] = []
       map[day].push(g.total_score ?? 0)
     }
