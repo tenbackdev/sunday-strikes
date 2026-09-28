@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase'
+import { useState } from 'react'
 import { FrameGrid } from './Scorecard'
 import { computeStats, isConvertedSplit } from '../lib/parseGame'
 import { avatarStyle } from '../lib/avatar'
+import { useVsMatches } from '../lib/useVsMatches'
+import { groupByOpponent } from '../lib/vsAggregates'
 
 const FIXED_H = 56
 
@@ -284,52 +285,11 @@ function OpponentCard({ stats, onFilter, isActive, statView, onStatViewChange })
 }
 
 export default function VSMatches({ session }) {
-  const [matches, setMatches] = useState([])
-  const [loading, setLoading] = useState(true)
+  const { matches, loading } = useVsMatches(session)
   const [timeFilter, setTimeFilter] = useState('all')
   const [opponentFilter, setOpponentFilter] = useState(null)
   const [cardStatView, setCardStatView] = useState({})
   const getCardView = id => cardStatView[id] ?? 'record'
-
-  async function loadVsData() {
-    setLoading(true)
-    const userId = session.user.id
-    const { data: matchRows } = await supabase
-      .from('vs_matches')
-      .select('id, submitter_id, opponent_id, submitter_game_id, opponent_game_id, played_at')
-      .or(`submitter_id.eq.${userId},opponent_id.eq.${userId}`)
-      .order('played_at', { ascending: false })
-
-    if (!matchRows || matchRows.length === 0) { setMatches([]); setLoading(false); return }
-
-    const allUserIds = [...new Set(matchRows.flatMap(m => [m.submitter_id, m.opponent_id]))]
-    const allGameIds = matchRows.flatMap(m => [m.submitter_game_id, m.opponent_game_id])
-
-    const [profilesRes, gamesRes] = await Promise.all([
-      supabase.from('profiles').select('id, display_name, email, avatar_color').in('id', allUserIds),
-      supabase.from('games').select('id, user_id, total_score, frames').in('id', allGameIds),
-    ])
-
-    const profileMap = Object.fromEntries((profilesRes.data || []).map(p => [p.id, p]))
-    const gameMap = Object.fromEntries((gamesRes.data || []).map(g => [g.id, g]))
-
-    const enriched = matchRows.map(m => {
-      const iAmSubmitter = m.submitter_id === userId
-      const myGame = gameMap[iAmSubmitter ? m.submitter_game_id : m.opponent_game_id]
-      const theirGame = gameMap[iAmSubmitter ? m.opponent_game_id : m.submitter_game_id]
-      const opponentId = iAmSubmitter ? m.opponent_id : m.submitter_id
-      const opponentProfile = profileMap[opponentId] ?? { id: opponentId }
-      const myScore = myGame?.total_score ?? 0
-      const theirScore = theirGame?.total_score ?? 0
-      const result = myScore > theirScore ? 'W' : myScore < theirScore ? 'L' : 'T'
-      return { ...m, myGame, theirGame, opponentProfile, result }
-    })
-
-    setMatches(enriched)
-    setLoading(false)
-  }
-
-  useEffect(() => { loadVsData() }, [])
 
   const now = new Date()
   const timeFiltered = matches.filter(m => {
@@ -349,33 +309,7 @@ export default function VSMatches({ session }) {
   const avgMyScore = total > 0 ? Math.round(filtered.reduce((s, m) => s + (m.myGame?.total_score ?? 0), 0) / total) : 0
   const totalPinDiff = filtered.reduce((s, m) => s + ((m.myGame?.total_score ?? 0) - (m.theirGame?.total_score ?? 0)), 0)
 
-  const byOpponent = {}
-  timeFiltered.forEach(m => {
-    const key = m.opponentProfile?.id
-    if (!key) return
-    if (!byOpponent[key]) byOpponent[key] = {
-      profile: m.opponentProfile, w: 0, l: 0, t: 0,
-      myPins: 0, oppPins: 0,
-      myStrikes: 0, oppStrikes: 0,
-      mySpares: 0, oppSpares: 0,
-      myOpens: 0, oppOpens: 0,
-      matches: [],
-    }
-    const b = byOpponent[key]
-    if (m.result === 'W') b.w++; else if (m.result === 'L') b.l++; else b.t++
-    b.myPins += m.myGame?.total_score ?? 0
-    b.oppPins += m.theirGame?.total_score ?? 0
-    if (m.myGame?.frames) {
-      const s = computeStats(m.myGame.frames)
-      b.myStrikes += s.strikes; b.mySpares += s.spares; b.myOpens += s.opens
-    }
-    if (m.theirGame?.frames) {
-      const s = computeStats(m.theirGame.frames)
-      b.oppStrikes += s.strikes; b.oppSpares += s.spares; b.oppOpens += s.opens
-    }
-    b.matches.push(m)
-  })
-  const opponentStats = Object.values(byOpponent).sort((a, b) => (b.w + b.l + b.t) - (a.w + a.l + a.t))
+  const opponentStats = groupByOpponent(timeFiltered)
 
   const activeOpponentName = opponentFilter
     ? opponentStats.find(s => s.profile?.id === opponentFilter)?.profile?.display_name ||

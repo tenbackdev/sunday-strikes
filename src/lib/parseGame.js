@@ -156,11 +156,31 @@ export function isConvertedSplit(frame) {
   return b2 === '/'
 }
 
+// Number of "racks" (freshly-set pin setups) faced — the correct denominator for strike
+// rate, since the 10th frame can face 1–3 racks depending on strikes/spares thrown.
+export function countRacks(frames) {
+  let racks = 0
+  for (const frame of frames) {
+    if (frame.frame !== 10) { racks++; continue }
+    const [b1, b2] = frame.balls
+    racks++
+    if (b1 === 'X') {
+      racks++
+      if (b2 === 'X') racks++
+    } else if (b2 === '/') {
+      racks++
+    }
+  }
+  return racks
+}
+
 // Per-game leave analysis: classifies each non-strike frame by pins left after first ball,
 // tracks spare conversion, and estimates missed score opportunity (pins left + bonus ball).
 // careerAvgFB: caller-supplied career first-ball average used to estimate the unthrown fill
 // ball when frame 10's first rack is open (the fill ball is never thrown in that case).
-export function computeLeaveMetrics(frames, careerAvgFB = 7) {
+// splitFilter: 'all' | 'split' | 'nonsplit' — restricts which leaves are counted/converted,
+// without skipping frames in the loop (next-ball lookahead below needs correct indexing).
+export function computeLeaveMetrics(frames, careerAvgFB = 7, splitFilter = 'all') {
   let singleAttempts = 0, singleConv = 0
   let multiAttempts = 0, multiConv = 0
   // Buckets 1–9, where key 9 = "9 or more pins left" (includes gutter-ball leaves)
@@ -177,6 +197,8 @@ export function computeLeaveMetrics(frames, careerAvgFB = 7) {
 
     if (b1 === 'X') continue   // strike — no spare attempt this rack
     if (!b2) continue          // incomplete frame
+    if (splitFilter === 'split' && !frame.split) continue
+    if (splitFilter === 'nonsplit' && frame.split) continue
 
     const firstCount = b1 === '-' ? 0 : (parseInt(b1, 10) || 0)
     const pinsLeft = 10 - firstCount

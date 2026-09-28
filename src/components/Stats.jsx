@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
-import { computeStats, computeLeaveMetrics } from '../lib/parseGame'
+import { computeStats, computeLeaveMetrics, countRacks } from '../lib/parseGame'
+import { AMBER, SCORE_BUCKETS as DIST_BUCKETS, MIN_TREND_SAMPLE, getChartColors, toLocalDateStr } from '../lib/chartFormat'
+import { LegendDot, ChartCard, Ribbon } from '../lib/chartUtils'
 import {
   ComposedChart, BarChart,
   Area, Line, Bar, Cell,
@@ -14,6 +16,12 @@ const TIME_FILTERS = [
   { key: '30d',  label: '30 Days' },
 ]
 
+const SPARE_LEAVE_FILTERS = [
+  { key: 'all',      label: 'All' },
+  { key: 'split',    label: 'Split' },
+  { key: 'nonsplit', label: 'Non-Split' },
+]
+
 const STAT_TABS = [
   { key: 'overview', label: 'Overview' },
   { key: 'strikes',  label: 'Strikes' },
@@ -21,34 +29,7 @@ const STAT_TABS = [
   { key: 'pins',     label: 'Pins' },
 ]
 
-const AMBER = '#BE7C2A'
 const FIXED_H = 56
-
-// Fixed bucket definitions — always 12 buckets regardless of data
-const DIST_BUCKETS = [
-  { label: '< 100', test: s => s < 100, isPerfect: false },
-  ...Array.from({ length: 10 }, (_, i) => {
-    const lo = 100 + i * 20
-    return { label: String(lo), test: s => s >= lo && s < lo + 20, isPerfect: false }
-  }),
-  { label: '300', test: s => s === 300, isPerfect: true },
-]
-
-function getChartColors() {
-  const s = getComputedStyle(document.documentElement)
-  return {
-    accent: s.getPropertyValue('--accent').trim() || '#CE1B0E',
-    sub:    s.getPropertyValue('--sub').trim()    || '#9E8B6E',
-    border: s.getPropertyValue('--border').trim() || '#DECCA2',
-    text:   s.getPropertyValue('--text').trim()   || '#2C1810',
-    third:  '#4A7FA5',
-  }
-}
-
-function toLocalDateStr(isoStr) {
-  const d = new Date(isoStr)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
 
 function fmtDate(dateStr) {
   const [y, m, d] = dateStr.split('-').map(Number)
@@ -126,22 +107,6 @@ function FirstBallTooltip({ active, payload, label }) {
   )
 }
 
-function countRacks(frames) {
-  let racks = 0
-  for (const frame of frames) {
-    if (frame.frame !== 10) { racks++; continue }
-    const [b1, b2] = frame.balls
-    racks++
-    if (b1 === 'X') {
-      racks++
-      if (b2 === 'X') racks++
-    } else if (b2 === '/') {
-      racks++
-    }
-  }
-  return racks
-}
-
 function extractStreaks(frames) {
   const isStrike = []
   for (const frame of frames) {
@@ -209,15 +174,6 @@ function RunTooltip({ active, payload, label }) {
   )
 }
 
-function LegendDot({ color, label }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-      <div style={{ width: 6, height: 6, borderRadius: '50%', background: color }} />
-      <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8, fontWeight: 700, letterSpacing: '0.05em', color: 'var(--sub)' }}>{label}</span>
-    </div>
-  )
-}
-
 function LeaveComboTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null
   const count    = payload.find(p => p.dataKey === 'count')?.value
@@ -269,48 +225,6 @@ function RollingSplitTooltip({ active, payload, label }) {
 }
 
 
-function ChartCard({ title, titleRight, titleBelow, children }) {
-  return (
-    <div style={{ border: '1px solid var(--border)', borderRadius: 12, background: 'var(--card)', paddingTop: 14, paddingBottom: 10, overflow: 'hidden' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: titleBelow ? 4 : 10, paddingLeft: 16, paddingRight: 16 }}>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', color: 'var(--sub)' }}>
-          {title}
-        </div>
-        {titleRight}
-      </div>
-      {titleBelow && (
-        <div style={{ display: 'flex', gap: 12, marginBottom: 10, paddingLeft: 16, paddingRight: 16 }}>
-          {titleBelow}
-        </div>
-      )}
-      {children}
-    </div>
-  )
-}
-
-function RibbonStat({ label, value, amber }) {
-  return (
-    <div style={{ flex: 1, padding: '10px 0 11px', textAlign: 'center' }}>
-      <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 22, letterSpacing: '-0.02em', color: amber ? AMBER : 'var(--text)', lineHeight: 1 }}>
-        {value}
-      </div>
-      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8.5, fontWeight: 700, letterSpacing: '0.1em', color: 'var(--sub)', marginTop: 4 }}>{label}</div>
-    </div>
-  )
-}
-
-function Ribbon({ stats }) {
-  return (
-    <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', background: 'var(--card)', boxShadow: '0 1px 2px rgba(60,40,15,0.05)' }}>
-      {stats.map((s, i) => (
-        <div key={s.label} style={{ flex: 1, borderLeft: i ? '1px solid var(--border)' : 'none' }}>
-          <RibbonStat label={s.label} value={s.value} amber={s.amber} />
-        </div>
-      ))}
-    </div>
-  )
-}
-
 function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center rounded-2xl py-16 mt-6" style={{ border: '2px dashed var(--border)' }}>
@@ -326,6 +240,7 @@ export default function Stats({ session, theme }) {
   const [games, setGames]           = useState([])
   const [isLoading, setIsLoading]   = useState(true)
   const [streakMode, setStreakMode]  = useState('inclusive')
+  const [spareLeaveFilter, setSpareLeaveFilter] = useState('all')
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const colors = useMemo(() => getChartColors(), [theme])
@@ -540,16 +455,26 @@ export default function Stats({ session, theme }) {
     }
     const careerAvgFB = fbCount > 0 ? fbTotal / fbCount : 7
 
-    // Per-game leave metrics (indexed parallel to games[])
+    // Per-game leave metrics (indexed parallel to games[]) — unfiltered, drives the
+    // ribbon's SINGLE-PIN %/MULTI-PIN % and the rolling conversion chart below.
     const perGameLeave = games.map(g => computeLeaveMetrics(g.frames ?? [], careerAvgFB))
+    // Same, but respecting the all/split/non-split toggle — drives only the leave-count
+    // distribution chart, so the filter's blast radius stays scoped to that one chart.
+    const perGameLeaveFiltered = spareLeaveFilter === 'all'
+      ? perGameLeave
+      : games.map(g => computeLeaveMetrics(g.frames ?? [], careerAvgFB, spareLeaveFilter))
 
     // Aggregate leave metrics across all games
     let singleAttempts = 0, singleConv = 0, multiAttempts = 0, multiConv = 0
-    const aggrLeave = {}
-    for (let i = 1; i <= 9; i++) aggrLeave[i] = { count: 0, converted: 0 }
     for (const lm of perGameLeave) {
       singleAttempts += lm.singleAttempts; singleConv += lm.singleConv
       multiAttempts  += lm.multiAttempts;  multiConv  += lm.multiConv
+    }
+
+    // Leave counts respecting the split filter — feeds Chart 1 only
+    const aggrLeave = {}
+    for (let i = 1; i <= 9; i++) aggrLeave[i] = { count: 0, converted: 0 }
+    for (const lm of perGameLeaveFiltered) {
       for (let i = 1; i <= 9; i++) {
         aggrLeave[i].count     += lm.leaveCounts[i].count
         aggrLeave[i].converted += lm.leaveCounts[i].converted
@@ -573,7 +498,7 @@ export default function Stats({ session, theme }) {
       return {
         label: key === 9 ? '9+' : String(key),
         count,
-        convRate: count > 0 ? Math.round((converted / count) * 100) : null,
+        convRate: count >= MIN_TREND_SAMPLE ? Math.round((converted / count) * 100) : null,
       }
     })
 
@@ -594,9 +519,9 @@ export default function Stats({ session, theme }) {
       const wOpps = wSp + wOp
       return {
         index:     i + 1,
-        overall:   wOpps > 0 ? Math.round((wSp / wOpps) * 100) : null,
-        singlePin: wSA  > 0  ? Math.round((wSC / wSA)   * 100) : null,
-        multiPin:  wMA  > 0  ? Math.round((wMC / wMA)   * 100) : null,
+        overall:   wOpps >= MIN_TREND_SAMPLE ? Math.round((wSp / wOpps) * 100) : null,
+        singlePin: wSA  >= MIN_TREND_SAMPLE  ? Math.round((wSC / wSA)   * 100) : null,
+        multiPin:  wMA  >= MIN_TREND_SAMPLE  ? Math.round((wMC / wMA)   * 100) : null,
       }
     })
 
@@ -611,7 +536,7 @@ export default function Stats({ session, theme }) {
       }
       return {
         index:         i + 1,
-        splitConvRate: wSplits > 0 ? Math.round((wConv / wSplits) * 100) : null,
+        splitConvRate: wSplits >= MIN_TREND_SAMPLE ? Math.round((wConv / wSplits) * 100) : null,
         windowSplits:  wSplits,
       }
     })
@@ -628,7 +553,7 @@ export default function Stats({ session, theme }) {
       rollingSplitData,
       hasSplits,
     }
-  }, [games])
+  }, [games, spareLeaveFilter])
 
   // ── Pins derived data ─────────────────────────────────────────────────────────
 
@@ -1051,7 +976,34 @@ export default function Stats({ session, theme }) {
                 <Ribbon stats={sparesData.ribbon} />
 
                 {/* Chart 1 — Leave Count: Frequency + Conversion combo */}
-                <ChartCard title="SPARE ATTEMPTS — LEAVE COUNT &amp; CONVERSION RATE">
+                <ChartCard
+                  title="SPARE ATTEMPTS — LEAVE COUNT &amp; CONVERSION RATE"
+                  titleRight={
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      {SPARE_LEAVE_FILTERS.map(({ key, label }) => (
+                        <button
+                          key={key}
+                          onClick={() => setSpareLeaveFilter(key)}
+                          style={spareLeaveFilter === key ? {
+                            padding: '2px 7px', borderRadius: 6,
+                            fontSize: 8, fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, letterSpacing: '0.05em',
+                            background: 'color-mix(in srgb, var(--accent) 15%, transparent)',
+                            color: 'var(--accent)',
+                            border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)',
+                            cursor: 'pointer',
+                          } : {
+                            padding: '2px 7px', borderRadius: 6,
+                            fontSize: 8, fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, letterSpacing: '0.05em',
+                            color: 'var(--sub)', border: '1px solid var(--border)',
+                            background: 'transparent', cursor: 'pointer',
+                          }}
+                        >
+                          {label.toUpperCase()}
+                        </button>
+                      ))}
+                    </div>
+                  }
+                >
                   <ResponsiveContainer width="100%" height={220}>
                     <ComposedChart data={sparesData.leaveDist} margin={{ left: 8, right: 16, top: 4, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke={colors.border} strokeOpacity={0.6} vertical={false} />
