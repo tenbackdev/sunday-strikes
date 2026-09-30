@@ -86,6 +86,7 @@ function SettingToggle({ offLabel, onLabel, checked, onChange }) {
 const PAGE_OPTIONS = [
   { value: 'my-games', label: 'My Games' },
   { value: 'vs-matches', label: 'VS' },
+  { value: 'vs-stats', label: 'VS Stats' },
   { value: 'stats', label: 'Stats' },
 ]
 
@@ -335,7 +336,7 @@ export default function UserMenu({ session, theme, onThemeChange, cardPreview, o
         {/* Default Page */}
         <div>
           <SectionLabel>Default Page</SectionLabel>
-          <div style={{ display: 'flex', gap: 6 }}>
+          <div style={{ display: 'flex', gap: 4 }}>
             {PAGE_OPTIONS.map(opt => (
               <button
                 key={opt.value}
@@ -343,10 +344,14 @@ export default function UserMenu({ session, theme, onThemeChange, cardPreview, o
                 disabled={!profileLoaded}
                 style={{
                   flex: 1,
+                  minWidth: 0,
                   borderRadius: 8,
-                  padding: '6px 4px',
-                  fontSize: 11,
+                  padding: '6px 2px',
+                  fontSize: 9.5,
                   fontWeight: 600,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
                   border: `1px solid ${defaultPage === opt.value ? 'var(--accent)' : 'var(--border)'}`,
                   background: defaultPage === opt.value ? 'color-mix(in srgb, var(--accent) 15%, transparent)' : 'var(--elevated)',
                   color: defaultPage === opt.value ? 'var(--accent)' : 'var(--sub)',
