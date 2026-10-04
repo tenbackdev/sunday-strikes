@@ -193,7 +193,7 @@ export default function Layout({ session }) {
   async function loadProfile() {
     const { data } = await supabase
       .from('profiles')
-      .select('player_label, display_name, theme_preference, default_page, avatar_color')
+      .select('player_label, display_name, theme_preference, default_page, avatar_color, score_bucket_size')
       .eq('id', session.user.id)
       .single()
     setProfile(data)
@@ -403,8 +403,8 @@ export default function Layout({ session }) {
           )}
           {activePage === 'find-friends' && <FindFriends session={session} />}
           {activePage === 'vs-matches' && <VSMatches session={session} />}
-          {activePage === 'vs-stats' && <VSStats session={session} theme={theme} />}
-          {activePage === 'stats' && <Stats session={session} theme={theme} />}
+          {activePage === 'vs-stats' && <VSStats session={session} theme={theme} bucketSize={profile?.score_bucket_size} />}
+          {activePage === 'stats' && <Stats session={session} theme={theme} bucketSize={profile?.score_bucket_size} />}
           {activePage === 'admin' && <Admin session={session} />}
         </div>
       </main>

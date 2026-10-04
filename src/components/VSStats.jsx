@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { useVsMatches } from '../lib/useVsMatches'
 import { groupByOpponent } from '../lib/vsAggregates'
 import { computeStats, countRacks } from '../lib/parseGame'
-import { SCORE_BUCKETS, MIN_TREND_SAMPLE, getChartColors } from '../lib/chartFormat'
+import { getScoreBuckets, bucketAxisProps, normalizeBucketSize, MIN_TREND_SAMPLE, getChartColors } from '../lib/chartFormat'
 import { ChartCard, LegendDot } from '../lib/chartUtils'
 import {
   ComposedChart, BarChart, ScatterChart,
@@ -147,7 +147,8 @@ function AvgScoreCompare({ myAvg, oppAvg, oppName }) {
   )
 }
 
-export default function VSStats({ session, theme }) {
+export default function VSStats({ session, theme, bucketSize: bucketSizeProp }) {
+  const bucketSize = normalizeBucketSize(bucketSizeProp)
   const { matches, loading } = useVsMatches(session)
   const [timeFilter, setTimeFilter] = useState('all')
   const [opponentFilter, setOpponentFilter] = useState(null)
@@ -176,8 +177,8 @@ export default function VSStats({ session, theme }) {
   const activeOpponentName = activeOpponent?.profile?.display_name || activeOpponent?.profile?.email || 'Opponent'
 
   const scoreResultData = useMemo(
-    () => bucketResultCounts(filtered, SCORE_BUCKETS, m => m.myGame?.total_score ?? 0),
-    [filtered]
+    () => bucketResultCounts(filtered, getScoreBuckets(bucketSize), m => m.myGame?.total_score ?? 0),
+    [filtered, bucketSize]
   )
 
   const marginResultData = useMemo(
@@ -317,7 +318,7 @@ export default function VSStats({ session, theme }) {
             <ResponsiveContainer width="100%" height={240}>
               <ComposedChart data={scoreResultData} margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke={colors.border} strokeOpacity={0.6} vertical={false} />
-                <XAxis dataKey="label" interval={0} tick={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, fill: colors.sub }} axisLine={false} tickLine={false} />
+                <XAxis dataKey="label" interval={0} tick={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, fill: colors.sub }} axisLine={false} tickLine={false} {...bucketAxisProps(bucketSize)} />
                 <YAxis yAxisId="left" allowDecimals={false} tick={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fill: colors.sub }} axisLine={false} tickLine={false} width={30} />
                 <YAxis yAxisId="right" orientation="right" domain={[0, 100]} tickFormatter={v => `${v}%`} tick={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fill: colors.sub }} axisLine={false} tickLine={false} width={40} />
                 <Tooltip content={<ResultStackTooltip lineColor={colors.third} />} />

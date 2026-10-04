@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import { computeStats, computeLeaveMetrics, countRacks } from '../lib/parseGame'
-import { AMBER, SCORE_BUCKETS as DIST_BUCKETS, MIN_TREND_SAMPLE, getChartColors, toLocalDateStr } from '../lib/chartFormat'
+import { AMBER, getScoreBuckets, bucketAxisProps, normalizeBucketSize, MIN_TREND_SAMPLE, getChartColors, toLocalDateStr } from '../lib/chartFormat'
 import { LegendDot, ChartCard, Ribbon } from '../lib/chartUtils'
 import {
   ComposedChart, BarChart,
@@ -72,14 +72,14 @@ function RollingTooltip({ active, payload, label }) {
   )
 }
 
-function DistributionTooltip({ active, payload, label }) {
+function DistributionTooltip({ active, payload, label, bucketSize }) {
   if (!active || !payload?.length) return null
   const count = payload[0]?.value
   return (
     <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', fontSize: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
       <div style={{ fontFamily: "'JetBrains Mono', monospace", color: 'var(--text)', fontWeight: 700 }}>{count} {count === 1 ? 'game' : 'games'}</div>
       <div style={{ fontFamily: "'JetBrains Mono', monospace", color: 'var(--sub)', fontSize: 10 }}>
-        {label === '300' ? 'Perfect game' : label === '< 100' ? 'Under 100' : `${label}–${Number(label) + 19}`}
+        {label === '300' ? 'Perfect game' : label === '< 100' ? 'Under 100' : `${label}–${Number(label) + bucketSize - 1}`}
       </div>
     </div>
   )
@@ -234,7 +234,8 @@ function EmptyState() {
   )
 }
 
-export default function Stats({ session, theme }) {
+export default function Stats({ session, theme, bucketSize: bucketSizeProp }) {
+  const bucketSize = normalizeBucketSize(bucketSizeProp)
   const [timeFilter, setTimeFilter] = useState(() => localStorage.getItem('ss_stats_time_filter') ?? localStorage.getItem('ss_trends_time_filter') ?? 'all')
   const [statsTab,   setStatsTab]   = useState('overview')
   const [games, setGames]           = useState([])
@@ -312,8 +313,9 @@ export default function Stats({ session, theme }) {
     })
   }, [games])
 
-  // Always 12 fixed buckets — no gaps even if a range has zero games
+  // Fixed bucket set (width from user settings) — no gaps even if a range has zero games
   const distribution = useMemo(() => {
+    const DIST_BUCKETS = getScoreBuckets(bucketSize)
     if (!games.length) return DIST_BUCKETS.map(b => ({ label: b.label, count: 0, isPerfect: b.isPerfect, isMax: false }))
     const scores = games.map(g => g.total_score ?? 0)
     const result = DIST_BUCKETS.map(b => ({
@@ -323,7 +325,7 @@ export default function Stats({ session, theme }) {
     }))
     const peak = Math.max(...result.map(r => r.count))
     return result.map(r => ({ ...r, isMax: peak > 0 && r.count === peak }))
-  }, [games])
+  }, [games, bucketSize])
 
   // ── Strikes derived data ──────────────────────────────────────────────────────
 
@@ -775,6 +777,7 @@ export default function Stats({ session, theme }) {
                         tick={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, fill: colors.sub }}
                         axisLine={false}
                         tickLine={false}
+                        {...bucketAxisProps(bucketSize)}
                       />
                       <YAxis
                         allowDecimals={false}
@@ -783,7 +786,7 @@ export default function Stats({ session, theme }) {
                         tickLine={false}
                         width={30}
                       />
-                      <Tooltip content={<DistributionTooltip />} />
+                      <Tooltip content={<DistributionTooltip bucketSize={bucketSize} />} />
                       <Bar dataKey="count" radius={[3, 3, 0, 0]} isAnimationActive={false}>
                         {distribution.map((entry, i) => (
                           <Cell key={i} fill={colors.accent} fillOpacity={entry.isMax ? 1 : 0.35} />

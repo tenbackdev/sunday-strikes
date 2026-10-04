@@ -6,16 +6,35 @@ export const AMBER = '#BE7C2A'
 // personal Stats and VS Stats pages.
 export const MIN_TREND_SAMPLE = 10
 
-// Fixed 20-pt score buckets — always the same set regardless of data, per the
+// Bucket widths a user can choose in Account Settings (profiles.score_bucket_size).
+export const DEFAULT_BUCKET_SIZE = 20
+export const BUCKET_SIZES = [10, 20]
+
+export function normalizeBucketSize(size) {
+  return BUCKET_SIZES.includes(size) ? size : DEFAULT_BUCKET_SIZE
+}
+
+// Fixed score buckets (10- or 20-pt wide) — always the same set regardless of data, per the
 // "score distribution buckets must be pre-defined and complete" rule (300 gets its own bucket).
-export const SCORE_BUCKETS = [
-  { label: '< 100', test: s => s < 100, isPerfect: false },
-  ...Array.from({ length: 10 }, (_, i) => {
-    const lo = 100 + i * 20
-    return { label: String(lo), test: s => s >= lo && s < lo + 20, isPerfect: false }
-  }),
-  { label: '300', test: s => s === 300, isPerfect: true },
-]
+// Labels are each bucket's lower bound; the 100–299 span is always fully covered.
+export function getScoreBuckets(size = DEFAULT_BUCKET_SIZE) {
+  const width = normalizeBucketSize(size)
+  return [
+    { label: '< 100', test: s => s < 100, isPerfect: false },
+    ...Array.from({ length: 200 / width }, (_, i) => {
+      const lo = 100 + i * width
+      return { label: String(lo), test: s => s >= lo && s < lo + width, isPerfect: false }
+    }),
+    { label: '300', test: s => s === 300, isPerfect: true },
+  ]
+}
+
+// X-axis props for a bucket-labelled chart; 10-pt buckets (22 labels) need angled ticks to fit.
+export function bucketAxisProps(size) {
+  return normalizeBucketSize(size) === 10
+    ? { angle: -45, textAnchor: 'end', height: 36 }
+    : {}
+}
 
 export function getChartColors() {
   const s = getComputedStyle(document.documentElement)

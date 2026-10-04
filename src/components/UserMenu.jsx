@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import { AVATAR_COLORS, avatarStyle } from '../lib/avatar'
+import { normalizeBucketSize } from '../lib/chartFormat'
 
 function getInitials(session) {
   const name = session.user.user_metadata?.full_name || session.user.email || ''
@@ -90,6 +91,11 @@ const PAGE_OPTIONS = [
   { value: 'stats', label: 'Stats' },
 ]
 
+const BUCKET_OPTIONS = [
+  { value: 20, label: '20 pins (240–259)' },
+  { value: 10, label: '10 pins (240–249)' },
+]
+
 export default function UserMenu({ session, theme, onThemeChange, cardPreview, onCardPreviewChange, onProfileSave, profileAvatarColor }) {
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState({ top: 0, right: 0 })
@@ -98,6 +104,7 @@ export default function UserMenu({ session, theme, onThemeChange, cardPreview, o
   const [playerLabel, setPlayerLabel] = useState('')
   const [avatarColor, setAvatarColor] = useState(profileAvatarColor ?? null)
   const [defaultPage, setDefaultPage] = useState('my-games')
+  const [bucketSize, setBucketSize] = useState(20)
   const [profileLoaded, setProfileLoaded] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -123,7 +130,7 @@ export default function UserMenu({ session, theme, onThemeChange, cardPreview, o
     setProfileLoaded(false)
     supabase
       .from('profiles')
-      .select('display_name, player_label, avatar_color, default_page')
+      .select('display_name, player_label, avatar_color, default_page, score_bucket_size')
       .eq('id', session.user.id)
       .single()
       .then(({ data }) => {
@@ -131,6 +138,7 @@ export default function UserMenu({ session, theme, onThemeChange, cardPreview, o
         setPlayerLabel(data?.player_label ?? '')
         setAvatarColor(data?.avatar_color ?? null)
         setDefaultPage(data?.default_page ?? 'my-games')
+        setBucketSize(normalizeBucketSize(data?.score_bucket_size))
         setProfileLoaded(true)
       })
   }, [open])
@@ -157,6 +165,7 @@ export default function UserMenu({ session, theme, onThemeChange, cardPreview, o
       player_label: playerLabel.trim().toUpperCase(),
       avatar_color: avatarColor,
       default_page: defaultPage,
+      score_bucket_size: bucketSize,
       theme_preference: theme,
     }
     const { error } = await supabase
@@ -355,6 +364,39 @@ export default function UserMenu({ session, theme, onThemeChange, cardPreview, o
                   border: `1px solid ${defaultPage === opt.value ? 'var(--accent)' : 'var(--border)'}`,
                   background: defaultPage === opt.value ? 'color-mix(in srgb, var(--accent) 15%, transparent)' : 'var(--elevated)',
                   color: defaultPage === opt.value ? 'var(--accent)' : 'var(--sub)',
+                  cursor: 'pointer',
+                  transition: 'all .15s',
+                  opacity: profileLoaded ? 1 : 0.5,
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Score Chart Ranges */}
+        <div>
+          <SectionLabel>Score Chart Ranges</SectionLabel>
+          <div style={{ display: 'flex', gap: 4 }}>
+            {BUCKET_OPTIONS.map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => setBucketSize(opt.value)}
+                disabled={!profileLoaded}
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  borderRadius: 8,
+                  padding: '6px 2px',
+                  fontSize: 9.5,
+                  fontWeight: 600,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  border: `1px solid ${bucketSize === opt.value ? 'var(--accent)' : 'var(--border)'}`,
+                  background: bucketSize === opt.value ? 'color-mix(in srgb, var(--accent) 15%, transparent)' : 'var(--elevated)',
+                  color: bucketSize === opt.value ? 'var(--accent)' : 'var(--sub)',
                   cursor: 'pointer',
                   transition: 'all .15s',
                   opacity: profileLoaded ? 1 : 0.5,
