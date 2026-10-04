@@ -417,16 +417,37 @@ export function EditableFrameGrid({ frames, onChange }) {
   const containerRef = useRef(null)
   const borderStyle = '1px solid color-mix(in srgb, var(--border) 60%, transparent)'
 
-  // When keypad is open, push the scroll container down so content behind the
-  // fixed panel can still be scrolled into view.
+  // When keypad opens: reserve space below the scroll container so content
+  // behind the fixed panel stays reachable, then scroll the focused input
+  // into the visible zone above the keypad.
   useEffect(() => {
     const scrollEl = containerRef.current?.closest('[data-modal-scroll]')
     if (!scrollEl) return
+
     if (focusedBall !== null) {
       scrollEl.style.paddingBottom = `${KEYPAD_PANEL_H}px`
+
+      // After layout settles, ensure the focused input is visible above the
+      // keypad panel. preventScroll:true on .focus() means the browser won't
+      // do this automatically, so we handle it here.
+      requestAnimationFrame(() => {
+        const el = containerRef.current?.querySelector(
+          `[data-ball-fi="${focusedBall.fi}"][data-ball-bidx="${focusedBall.ballIdx}"]`
+        )
+        if (!el) return
+        const scrollRect = scrollEl.getBoundingClientRect()
+        const elRect = el.getBoundingClientRect()
+        const PADDING = 12 // breathing room above the input
+        // Bottom of the visible area above the fixed keypad panel
+        const visibleBottom = scrollRect.bottom - KEYPAD_PANEL_H - PADDING
+        if (elRect.bottom > visibleBottom) {
+          scrollEl.scrollBy({ top: elRect.bottom - visibleBottom, behavior: 'smooth' })
+        }
+      })
     } else {
       scrollEl.style.paddingBottom = ''
     }
+
     return () => { scrollEl.style.paddingBottom = '' }
   }, [focusedBall])
 
