@@ -112,11 +112,17 @@ function CountTooltip({ active, payload, label }) {
 
 function FirstBallTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null
-  const count = payload[0]?.value
+  const d = payload[0]?.payload
+  if (!d) return null
+  const isStrike = label === '10 (X)'
+  const cumLabel = isStrike ? 'Strikes' : label === '0–5' ? 'All first balls' : `${label}+ pins`
   return (
     <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', fontSize: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
-      <div style={{ fontFamily: "'JetBrains Mono', monospace", color: 'var(--text)', fontWeight: 700 }}>{count} {count === 1 ? 'frame' : 'frames'}</div>
-      <div style={{ fontFamily: "'JetBrains Mono', monospace", color: 'var(--sub)', fontSize: 10 }}>{label} pins on first ball</div>
+      <div style={{ fontFamily: "'JetBrains Mono', monospace", color: 'var(--text)', fontWeight: 700 }}>{d.count} {d.count === 1 ? 'frame' : 'frames'}</div>
+      <div style={{ fontFamily: "'JetBrains Mono', monospace", color: 'var(--sub)', fontSize: 10 }}>{isStrike ? 'strike on first ball' : `${label} pins on first ball`}</div>
+      <div style={{ fontFamily: "'JetBrains Mono', monospace", color: 'var(--sub)', fontSize: 11, marginTop: 4 }}>
+        {cumLabel} <span style={{ color: '#4A7FA5', fontWeight: 700 }}>{d.cumPct}%</span>
+      </div>
     </div>
   )
 }
@@ -624,7 +630,14 @@ export default function Stats({ session, oilFilter, theme, bucketSize: bucketSiz
     const totalPins  = games.reduce((s, g) => s + (g.total_score ?? 0), 0)
     const firstBallAvg = totalFirstBalls > 0 ? (totalFirstBallPins / totalFirstBalls).toFixed(1) : '0'
 
+    // Best outcome first (strike → 0–5); cumPct = share of first balls at this count or better
+    let cumulative = 0
     const firstBallDist = FB_LABELS.map((label, i) => ({ label, count: firstBallCounts[i] }))
+      .reverse()
+      .map(d => {
+        cumulative += d.count
+        return { ...d, cumPct: totalFirstBalls > 0 ? Math.round((cumulative / totalFirstBalls) * 1000) / 10 : 0 }
+      })
     const peakFB = Math.max(...firstBallDist.map(d => d.count))
 
     return {
@@ -1269,10 +1282,18 @@ export default function Stats({ session, oilFilter, theme, bucketSize: bucketSiz
               <Ribbon stats={pinsData.ribbon} />
 
               <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-              <ChartCard title="FIRST BALL PIN COUNT">
+              <ChartCard
+                title="FIRST BALL PIN COUNT"
+                titleBelow={
+                  <>
+                    <LegendDot color={colors.accent} label="FIRST BALLS" />
+                    <LegendDot color={colors.third}  label="CUMULATIVE % (THIS COUNT OR BETTER)" />
+                  </>
+                }
+              >
                 <div style={{ paddingLeft: 12, paddingRight: 12 }}>
                 <ResponsiveContainer width="100%" height={200}>
-                  <BarChart data={pinsData.firstBallDist} margin={{ left: 0, right: 8, top: 4, bottom: 0 }}>
+                  <ComposedChart data={pinsData.firstBallDist} margin={{ left: 0, right: 8, top: 4, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke={colors.border} strokeOpacity={0.6} vertical={false} />
                     <XAxis
                       dataKey="label"
@@ -1283,19 +1304,32 @@ export default function Stats({ session, oilFilter, theme, bucketSize: bucketSiz
                       tickLine={false}
                     />
                     <YAxis
+                      yAxisId="left"
                       allowDecimals={false}
                       tick={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fill: colors.sub }}
                       axisLine={false}
                       tickLine={false}
-                      width={30}
+                      width={36}
+                    />
+                    <YAxis
+                      yAxisId="right"
+                      orientation="right"
+                      domain={[0, 100]}
+                      ticks={[0, 25, 50, 75, 100]}
+                      tickFormatter={v => `${v}%`}
+                      tick={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fill: colors.sub }}
+                      axisLine={false}
+                      tickLine={false}
+                      width={40}
                     />
                     <Tooltip content={<FirstBallTooltip />} />
-                    <Bar dataKey="count" radius={[3, 3, 0, 0]} isAnimationActive={false}>
+                    <Bar yAxisId="left" dataKey="count" radius={[3, 3, 0, 0]} isAnimationActive={false}>
                       {pinsData.firstBallDist.map((entry, i) => (
                         <Cell key={i} fill={colors.accent} fillOpacity={entry.isMax ? 1 : 0.35} />
                       ))}
                     </Bar>
-                  </BarChart>
+                    <Line yAxisId="right" type="monotone" dataKey="cumPct" stroke={colors.third} strokeWidth={2} dot={{ r: 3, fill: colors.third, strokeWidth: 0 }} activeDot={{ r: 4, fill: colors.third, strokeWidth: 0 }} isAnimationActive={false} />
+                  </ComposedChart>
                 </ResponsiveContainer>
                 </div>
               </ChartCard>
