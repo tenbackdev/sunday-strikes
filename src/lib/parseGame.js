@@ -77,6 +77,52 @@ export function computeScores(frames) {
   })
 }
 
+// Splits each frame's score into where the points came from. Sums to the game total:
+//   firstBall   — pins on the first ball of every fresh rack (incl. 10th-frame fill racks)
+//   secondBall  — pins on spare attempts (second ball of a rack)
+//   strikeBonus — the two bonus rolls credited to a strike in frames 1–9
+//   spareBonus  — the one bonus roll credited to a spare in frames 1–9
+export function frameScoreParts(frames) {
+  if (!frames?.length) return []
+  const rolls = buildRolls(frames)
+  let rollIdx = 0
+  return frames.map(frame => {
+    const balls = frame.balls ?? []
+    const parts = { frame: frame.frame, firstBall: 0, secondBall: 0, strikeBonus: 0, spareBonus: 0 }
+    if (frame.frame === 10) {
+      const [b1, b2, b3] = balls
+      const r1 = pv(b1)
+      parts.firstBall += r1
+      if (b1 === 'X') {
+        const r2 = pv(b2)
+        parts.firstBall += r2
+        if (b3 != null) {
+          if (b2 === 'X') parts.firstBall += pv(b3)
+          else parts.secondBall += pv(b3, r2)
+        }
+      } else if (b2 != null) {
+        parts.secondBall += b2 === '/' ? 10 - r1 : pv(b2)
+        if (b2 === '/' && b3 != null) parts.firstBall += pv(b3)
+      }
+    } else if (balls[0] === 'X') {
+      parts.firstBall = 10
+      parts.strikeBonus = (rolls[rollIdx + 1] ?? 0) + (rolls[rollIdx + 2] ?? 0)
+      rollIdx += 1
+    } else {
+      const r1 = pv(balls[0])
+      parts.firstBall = r1
+      if (balls[1] === '/') {
+        parts.secondBall = 10 - r1
+        parts.spareBonus = rolls[rollIdx + 2] ?? 0
+      } else {
+        parts.secondBall = pv(balls[1])
+      }
+      rollIdx += balls[1] != null ? 2 : 1
+    }
+    return parts
+  })
+}
+
 export function computeStats(frames) {
   let strikes = 0
   let spares = 0

@@ -4,6 +4,17 @@ import { computeStats, computeLeaveMetrics, countRacks } from '../lib/parseGame'
 import { applyOilFilter, oilLabel } from '../lib/oilType'
 import { AMBER, getScoreBuckets, bucketAxisProps, normalizeBucketSize, MIN_TREND_SAMPLE, getChartColors, toLocalDateStr } from '../lib/chartFormat'
 import { LegendDot, ChartCard, Ribbon } from '../lib/chartUtils'
+import { useIsDesktop } from '../lib/useMediaQuery'
+import {
+  firstBalls, scoreSummary, personalRecords, sessionOrderAvgs, activityByDay, monthlyBreakdown,
+  strikeCarry, perFrameRates, frameOutcomeMix, rollingStrikeAndFirstBall, opensDistribution, scoreComposition,
+} from '../lib/frameAnalytics'
+import {
+  PersonalRecordsCard, SessionOrderCard, ActivityHeatmap, MonthlyTableCard,
+  FrameRateCard, FrameOutcomeMixCard, RollingLineCard,
+  OpensDistCard, OpportunityCostCard, LeaveTableCard,
+  ScoreCompositionCard, PointsPerFrameCard,
+} from './stats/StatsDesktopCards'
 import {
   ComposedChart, BarChart,
   Area, Line, Bar, Cell,
@@ -22,6 +33,8 @@ const SPARE_LEAVE_FILTERS = [
   { key: 'split',    label: 'Split' },
   { key: 'nonsplit', label: 'Non-Split' },
 ]
+
+const LEAVE_TABLE_TITLES = { all: 'All leaves', split: 'Splits only', nonsplit: 'Non-splits only' }
 
 const STAT_TABS = [
   { key: 'overview', label: 'Overview' },
@@ -244,6 +257,7 @@ export default function Stats({ session, oilFilter, theme, bucketSize: bucketSiz
   const [isLoading, setIsLoading]   = useState(true)
   const [streakMode, setStreakMode]  = useState('inclusive')
   const [spareLeaveFilter, setSpareLeaveFilter] = useState('all')
+  const isDesktop = useIsDesktop()
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const colors = useMemo(() => getChartColors(), [theme])
@@ -485,6 +499,14 @@ export default function Stats({ session, oilFilter, theme, bucketSize: bucketSiz
       }
     }
 
+    // Pins left on the lane per game (missed pins + forfeited spare bonus), all vs non-split
+    let lostAll = 0, lostNonSplit = 0, hasEstimate = false
+    for (let i = 0; i < games.length; i++) {
+      lostAll += perGameLeave[i].missedPins
+      hasEstimate ||= perGameLeave[i].hasEstimate
+      lostNonSplit += computeLeaveMetrics(games[i].frames ?? [], careerAvgFB, 'nonsplit').missedPins
+    }
+
     const totalSpares = allStats.reduce((s, x) => s + x.spares, 0)
     const totalOpens  = allStats.reduce((s, x) => s + x.opens,  0)
     const totalSplits = allStats.reduce((s, x) => s + x.splits, 0)
@@ -557,6 +579,17 @@ export default function Stats({ session, oilFilter, theme, bucketSize: bucketSiz
       rollingConvData,
       rollingSplitData,
       hasSplits,
+      leaveRows: Array.from({ length: 9 }, (_, i) => ({
+        order: i + 1,
+        label: i === 8 ? '9+' : String(i + 1),
+        count: aggrLeave[i + 1].count,
+        converted: aggrLeave[i + 1].converted,
+      })),
+      opportunity: {
+        lostAll: lostAll / games.length,
+        lostNonSplit: lostNonSplit / games.length,
+        hasEstimate,
+      },
     }
   }, [games, spareLeaveFilter])
 
@@ -582,36 +615,10 @@ export default function Stats({ session, oilFilter, theme, bucketSize: bucketSiz
       else if (pins === 6) firstBallCounts[1]++
       else firstBallCounts[0]++
     }
-    const toPin = (b) => b === 'X' ? 10 : b === '-' ? 0 : parseInt(b, 10)
 
+    // Every fresh rack's first ball — frames 1–9 ball 1, plus each new 10th-frame rack
     for (const g of games) {
-      for (const f of g.frames ?? []) {
-        const balls = f.balls ?? []
-        if (f.frame !== 10) {
-          // Frames 1–9: only balls[0] is a first ball
-          const p = toPin(balls[0])
-          if (!isNaN(p)) bucketPin(p)
-        } else {
-          // 10th frame: each new rack's first ball counts
-          // balls[0] always a first ball
-          const p0 = toPin(balls[0])
-          if (!isNaN(p0)) bucketPin(p0)
-          // balls[1] is a first ball only if balls[0] was a strike (reset to full rack)
-          if (balls[0] === 'X') {
-            const p1 = toPin(balls[1])
-            if (!isNaN(p1)) bucketPin(p1)
-            // balls[2] is a first ball only if balls[1] was also a strike (turkey)
-            if (balls[1] === 'X') {
-              const p2 = toPin(balls[2])
-              if (!isNaN(p2)) bucketPin(p2)
-            }
-          } else if (balls[1] === '/') {
-            // spare in 10th → balls[2] is a fresh rack first ball
-            const p2 = toPin(balls[2])
-            if (!isNaN(p2)) bucketPin(p2)
-          }
-        }
-      }
+      for (const p of firstBalls(g.frames ?? [])) bucketPin(p)
     }
 
     const totalPins  = games.reduce((s, g) => s + (g.total_score ?? 0), 0)
@@ -630,6 +637,63 @@ export default function Stats({ session, oilFilter, theme, bucketSize: bucketSiz
     }
   }, [games])
 
+  // ── Desktop-only derived data (≥1024px), computed for the active tab only ────────
+
+  const desktop = useMemo(() => {
+    if (!isDesktop || !games.length) return null
+    switch (statsTab) {
+      case 'overview': {
+        const summary = scoreSummary(games)
+        return {
+          ribbonExtra: [
+            { label: 'LOW',     value: summary.low },
+            { label: 'STD DEV', value: `±${summary.stdDev}` },
+            { label: '200+',    value: `${summary.pct200}%` },
+            { label: 'CLEAN',   value: summary.cleanGames },
+            { label: 'SESSIONS', value: summary.sessions },
+          ],
+          records: personalRecords(games),
+          sessionOrder: sessionOrderAvgs(games),
+          activity: activityByDay(games),
+          monthly: monthlyBreakdown(games),
+        }
+      }
+      case 'strikes': {
+        const carry = strikeCarry(games)
+        return {
+          ribbonExtra: [
+            { label: 'X AFTER X',     value: carry.afterStrikePct != null ? `${carry.afterStrikePct}%` : '—' },
+            { label: 'X AFTER NON-X', value: carry.afterNonStrikePct != null ? `${carry.afterNonStrikePct}%` : '—' },
+            { label: 'TURKEYS',       value: carry.turkeys },
+          ],
+          perFrame: perFrameRates(games),
+          mix: frameOutcomeMix(games),
+          rolling: rollingStrikeAndFirstBall(games),
+        }
+      }
+      case 'spares': {
+        const opens = opensDistribution(games)
+        return {
+          perFrame: perFrameRates(games),
+          opens,
+          cleanPct: Math.round((opens[0].count / games.length) * 100),
+        }
+      }
+      case 'pins': {
+        const { composition, pointsPerFrame, bonusPerStrike, bonusPerSpare } = scoreComposition(games)
+        const perFrame = perFrameRates(games)
+        return {
+          composition,
+          bonusPerStrike,
+          bonusPerSpare,
+          pointsPerFrame: pointsPerFrame.map((p, i) => ({ ...p, firstBallAvg: perFrame[i].firstBallAvg })),
+          rolling: rollingStrikeAndFirstBall(games),
+        }
+      }
+      default: return null
+    }
+  }, [isDesktop, games, statsTab])
+
   const hasGames           = games.length > 0
   const bandTickInterval   = byDay.length > 20 ? Math.ceil(byDay.length / 10) - 1 : 'preserveStartEnd'
 
@@ -637,8 +701,9 @@ export default function Stats({ session, oilFilter, theme, bucketSize: bucketSiz
     <div style={{ marginTop: -24 }}>
       {/* ── Sticky filter header ── */}
       <div style={{ position: 'sticky', top: FIXED_H, zIndex: 18, background: 'var(--bg)', paddingTop: 8, paddingBottom: 12 }}>
-        {/* Time filter — top row */}
-        <div className="flex gap-1 rounded-xl p-1 mb-2" style={{ background: 'var(--elevated)', border: '1px solid var(--border)' }}>
+        <div className="lg:flex lg:items-center lg:gap-3">
+        {/* Time filter — top row (left on desktop) */}
+        <div className="flex gap-1 rounded-xl p-1 mb-2 lg:mb-0 lg:w-[380px] lg:shrink-0" style={{ background: 'var(--elevated)', border: '1px solid var(--border)' }}>
           {TIME_FILTERS.map(f => (
             <button
               key={f.key}
@@ -655,8 +720,8 @@ export default function Stats({ session, oilFilter, theme, bucketSize: bucketSiz
           ))}
         </div>
 
-        {/* Category tabs — bottom row */}
-        <div className="flex gap-1 rounded-xl p-1" style={{ background: 'var(--elevated)', border: '1px solid var(--border)' }}>
+        {/* Category tabs — bottom row (right on desktop) */}
+        <div className="flex gap-1 rounded-xl p-1 lg:flex-1" style={{ background: 'var(--elevated)', border: '1px solid var(--border)' }}>
           {STAT_TABS.map(t => (
             <button
               key={t.key}
@@ -671,6 +736,7 @@ export default function Stats({ session, oilFilter, theme, bucketSize: bucketSiz
               {t.label}
             </button>
           ))}
+        </div>
         </div>
       </div>
 
@@ -689,7 +755,7 @@ export default function Stats({ session, oilFilter, theme, bucketSize: bucketSiz
               {/* Ribbon */}
               {overviewRibbon && (
                 <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', background: 'var(--card)', boxShadow: '0 1px 2px rgba(60,40,15,0.05)' }}>
-                  {overviewRibbon.map((r, i) => (
+                  {(desktop?.ribbonExtra ? [...overviewRibbon.slice(0, 3), ...desktop.ribbonExtra, ...overviewRibbon.slice(3)] : overviewRibbon).map((r, i) => (
                     <div key={r.label} style={{ flex: 1, padding: '10px 0 11px', textAlign: 'center', borderLeft: i ? '1px solid var(--border)' : 'none' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, lineHeight: 1 }}>
                         <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 22, letterSpacing: '-0.02em', color: r.amber ? AMBER : 'var(--text)' }}>
@@ -708,7 +774,9 @@ export default function Stats({ session, oilFilter, theme, bucketSize: bucketSiz
                 </div>
               )}
 
-              {/* Chart A — Score Range Band */}
+              {/* Chart A — Score Range Band (+ Personal Records beside it on desktop) */}
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)]">
+              <div className="min-w-0">
               <ChartCard title="SCORE RANGE — HIGH / AVG / LOW PER SESSION">
                 <ResponsiveContainer width="100%" height={260}>
                   <ComposedChart data={byDay} margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
@@ -738,9 +806,12 @@ export default function Stats({ session, oilFilter, theme, bucketSize: bucketSiz
                   </ComposedChart>
                 </ResponsiveContainer>
               </ChartCard>
+              </div>
+              {desktop?.records && <PersonalRecordsCard records={desktop.records} />}
+              </div>
 
-              {/* Charts B + C — side by side on sm+, stacked on mobile */}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {/* Charts B + C — side by side on sm+, stacked on mobile; + session-order on desktop */}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
 
                 {/* Chart B — Rolling 10-Game Average */}
                 <ChartCard title="ROLLING 10-GAME AVERAGE">
@@ -799,7 +870,12 @@ export default function Stats({ session, oilFilter, theme, bucketSize: bucketSiz
                   </ResponsiveContainer>
                 </ChartCard>
 
+                {desktop?.sessionOrder && <div className="lg:col-span-2 xl:col-span-1"><SessionOrderCard data={desktop.sessionOrder} colors={colors} /></div>}
+
               </div>
+
+              {desktop?.activity && <ActivityHeatmap byDay={desktop.activity} colors={colors} />}
+              {desktop?.monthly && <MonthlyTableCard rows={desktop.monthly} />}
             </div>
           )}
         </>
@@ -816,9 +892,13 @@ export default function Stats({ session, oilFilter, theme, bucketSize: bucketSiz
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}>
 
-                <Ribbon stats={strikesData.ribbon} />
+                <Ribbon stats={desktop?.ribbonExtra ? [...strikesData.ribbon, ...desktop.ribbonExtra] : strikesData.ribbon} />
 
-                {/* Chart 1 — Strikes Per Session: High / Avg / Low */}
+                {desktop?.mix && <FrameOutcomeMixCard data={desktop.mix} colors={colors} />}
+
+                {/* Chart 1 — Strikes Per Session: High / Avg / Low (+ strike % by frame on desktop) */}
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)]">
+                <div className="min-w-0">
                 <ChartCard title="STRIKES PER SESSION — HIGH / AVG / LOW">
                   <ResponsiveContainer width="100%" height={220}>
                     <ComposedChart data={strikesData.strikesByDay} margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
@@ -849,9 +929,14 @@ export default function Stats({ session, oilFilter, theme, bucketSize: bucketSiz
                     </ComposedChart>
                   </ResponsiveContainer>
                 </ChartCard>
+                </div>
+                {desktop?.perFrame && (
+                  <FrameRateCard title="STRIKE % BY FRAME" data={desktop.perFrame} dataKey="strikePct" kind="strike" colors={colors} />
+                )}
+                </div>
 
-                {/* Charts 2 + 3 — side by side on sm+ */}
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {/* Charts 2 + 3 — side by side on sm+; + rolling strike % on desktop */}
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
 
                   {/* Chart 2 — Streak Distribution with A/B toggle */}
                   <ChartCard
@@ -934,6 +1019,12 @@ export default function Stats({ session, oilFilter, theme, bucketSize: bucketSiz
                     </ResponsiveContainer>
                   </ChartCard>
 
+                  {desktop?.rolling && (
+                    <div className="lg:col-span-2 xl:col-span-1">
+                      <RollingLineCard title="ROLLING 10-GAME STRIKE %" data={desktop.rolling} dataKey="strikePct" colors={colors} domain={[0, 100]} tickFormatter={v => `${v}%`} name="Strike %" />
+                    </div>
+                  )}
+
                 </div>
 
                 {/* Chart 4 — Strikes Per Game (count distribution) */}
@@ -981,7 +1072,9 @@ export default function Stats({ session, oilFilter, theme, bucketSize: bucketSiz
 
                 <Ribbon stats={sparesData.ribbon} />
 
-                {/* Chart 1 — Leave Count: Frequency + Conversion combo */}
+                {/* Chart 1 — Leave Count: Frequency + Conversion combo (+ leave table on desktop) */}
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)]">
+                <div className="min-w-0">
                 <ChartCard
                   title="SPARE ATTEMPTS — LEAVE COUNT &amp; CONVERSION RATE"
                   titleRight={
@@ -1044,6 +1137,14 @@ export default function Stats({ session, oilFilter, theme, bucketSize: bucketSiz
                     </ComposedChart>
                   </ResponsiveContainer>
                 </ChartCard>
+                </div>
+                {desktop && (
+                  <LeaveTableCard rows={sparesData.leaveRows} filterLabel={LEAVE_TABLE_TITLES[spareLeaveFilter]} />
+                )}
+                </div>
+
+                {/* Charts 2 + 3 — stacked on mobile, side by side on desktop */}
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
 
                 {/* Chart 2 — Rolling Spare Conversion: Overall / Single-Pin / Multi-Pin */}
                 <ChartCard
@@ -1135,6 +1236,22 @@ export default function Stats({ session, oilFilter, theme, bucketSize: bucketSiz
                   )}
                 </ChartCard>
 
+                </div>
+
+                {desktop?.opens && (
+                  <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3">
+                    <FrameRateCard title="SPARE CONVERSION BY FRAME" data={desktop.perFrame} dataKey="convPct" kind="spare" colors={colors} />
+                    <OpensDistCard data={desktop.opens} cleanPct={desktop.cleanPct} colors={colors} />
+                    <div className="lg:col-span-2 xl:col-span-1">
+                    <OpportunityCostCard
+                      avgScore={Math.round(games.reduce((s, g) => s + (g.total_score ?? 0), 0) / games.length)}
+                      lostAll={sparesData.opportunity.lostAll}
+                      lostNonSplit={sparesData.opportunity.lostNonSplit}
+                      hasEstimate={sparesData.opportunity.hasEstimate}
+                    />
+                    </div>
+                  </div>
+                )}
 
               </div>
             )
@@ -1151,6 +1268,7 @@ export default function Stats({ session, oilFilter, theme, bucketSize: bucketSiz
 
               <Ribbon stats={pinsData.ribbon} />
 
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
               <ChartCard title="FIRST BALL PIN COUNT">
                 <div style={{ paddingLeft: 12, paddingRight: 12 }}>
                 <ResponsiveContainer width="100%" height={200}>
@@ -1181,6 +1299,23 @@ export default function Stats({ session, oilFilter, theme, bucketSize: bucketSiz
                 </ResponsiveContainer>
                 </div>
               </ChartCard>
+              {desktop?.composition && <ScoreCompositionCard composition={desktop.composition} bonusPerStrike={desktop.bonusPerStrike} bonusPerSpare={desktop.bonusPerSpare} colors={colors} />}
+              </div>
+
+              {desktop?.pointsPerFrame && (
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                  <PointsPerFrameCard data={desktop.pointsPerFrame} colors={colors} />
+                  <RollingLineCard
+                    title="ROLLING 10-GAME FIRST-BALL AVERAGE"
+                    data={desktop.rolling}
+                    dataKey="firstBallAvg"
+                    colors={colors}
+                    domain={[dataMin => Math.max(0, Math.floor(dataMin - 0.5)), 10]}
+                    name="1st ball avg"
+                    suffix=""
+                  />
+                </div>
+              )}
 
             </div>
           )}

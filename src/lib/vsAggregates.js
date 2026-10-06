@@ -1,4 +1,4 @@
-import { computeStats } from './parseGame'
+import { computeStats, countRacks } from './parseGame'
 
 // Groups enriched vs_matches rows (see useVsMatches) by opponent, aggregating
 // record and per-game stats. Sorted by total matches played, descending.
@@ -13,6 +13,7 @@ export function groupByOpponent(matches) {
       myStrikes: 0, oppStrikes: 0,
       mySpares: 0, oppSpares: 0,
       myOpens: 0, oppOpens: 0,
+      myRacks: 0, oppRacks: 0,
       matches: [],
     }
     const b = byOpponent[key]
@@ -22,10 +23,12 @@ export function groupByOpponent(matches) {
     if (m.myGame?.frames) {
       const s = computeStats(m.myGame.frames)
       b.myStrikes += s.strikes; b.mySpares += s.spares; b.myOpens += s.opens
+      b.myRacks += countRacks(m.myGame.frames)
     }
     if (m.theirGame?.frames) {
       const s = computeStats(m.theirGame.frames)
       b.oppStrikes += s.strikes; b.oppSpares += s.spares; b.oppOpens += s.opens
+      b.oppRacks += countRacks(m.theirGame.frames)
     }
     b.matches.push(m)
   })

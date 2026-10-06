@@ -5,6 +5,12 @@ import { groupByOpponent } from '../lib/vsAggregates'
 import { computeStats, countRacks } from '../lib/parseGame'
 import { getScoreBuckets, bucketAxisProps, normalizeBucketSize, MIN_TREND_SAMPLE, getChartColors } from '../lib/chartFormat'
 import { ChartCard, LegendDot } from '../lib/chartUtils'
+import { useIsDesktop } from '../lib/useMediaQuery'
+import { vsSummary, frameLead, winLossProfile, opponentTimeline, playerSummary } from '../lib/frameAnalytics'
+import {
+  VSSummaryRibbon, FrameLeadCard, WinLossCard, OpponentLeaderboard,
+  OpponentTimelineCard, NetRecordCard, H2HTableCard,
+} from './stats/VSStatsDesktopCards'
 import {
   ComposedChart, BarChart, ScatterChart,
   Line, Bar, Scatter, Cell, ReferenceLine,
@@ -153,6 +159,7 @@ export default function VSStats({ session, oilFilter, theme, bucketSize: bucketS
   const { matches, loading } = useVsMatches(session)
   const [timeFilter, setTimeFilter] = useState('all')
   const [opponentFilter, setOpponentFilter] = useState(null)
+  const isDesktop = useIsDesktop()
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const colors = useMemo(() => getChartColors(), [theme])
@@ -237,18 +244,64 @@ export default function VSStats({ session, oilFilter, theme, bucketSize: bucketS
     }
   }, [filtered, opponentFilter])
 
+  // ── Desktop-only derivations ──
+  const desktop = useMemo(() => {
+    if (!isDesktop || filtered.length === 0) return null
+    return {
+      summary: vsSummary(filtered),
+      lead: frameLead(filtered),
+      winLoss: winLossProfile(filtered),
+      timeline: opponentFilter ? opponentTimeline(filtered) : null,
+      h2hFull: opponentFilter ? {
+        me:   playerSummary(filtered.map(m => m.myGame).filter(Boolean)),
+        them: playerSummary(filtered.map(m => m.theirGame).filter(Boolean)),
+      } : null,
+    }
+  }, [isDesktop, filtered, opponentFilter])
+
+  // Chart 5 — Head-to-Head Comparison (requires an opponent selected)
+  const h2hCard = (
+    <ChartCard title="HEAD-TO-HEAD COMPARISON">
+      {!opponentFilter && (
+        <div style={{ textAlign: 'center', paddingTop: 4, paddingBottom: 20, fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: 'var(--sub)' }}>
+          Select an opponent above to compare
+        </div>
+      )}
+      {opponentFilter && h2h && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingLeft: 16, paddingRight: 16 }}>
+          <AvgScoreCompare myAvg={h2h.myAvg} oppAvg={h2h.oppAvg} oppName={activeOpponentName} />
+          <ResponsiveContainer width="100%" height={140}>
+            <BarChart data={h2h.diverging} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={colors.border} strokeOpacity={0.6} horizontal={false} />
+              <XAxis type="number" domain={[-100, 100]} tickFormatter={v => `${Math.abs(v)}%`} tick={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fill: colors.sub }} axisLine={false} tickLine={false} />
+              <YAxis type="category" dataKey="label" tick={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fill: colors.text }} axisLine={false} tickLine={false} width={90} />
+              <Tooltip content={<DivergingTooltip oppName={activeOpponentName} />} cursor={{ fill: 'transparent' }} />
+              <Bar dataKey="me"  fill={colors.accent} radius={[3, 0, 0, 3]} isAnimationActive={false} />
+              <Bar dataKey="opp" fill={colors.sub}    radius={[0, 3, 3, 0]} fillOpacity={0.6} isAnimationActive={false} />
+            </BarChart>
+          </ResponsiveContainer>
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', paddingBottom: 6 }}>
+            <LegendDot color={colors.accent} label="YOU" />
+            <LegendDot color={colors.sub} label={activeOpponentName.toUpperCase()} />
+          </div>
+        </div>
+      )}
+    </ChartCard>
+  )
+
   const hasMatches = matches.length > 0
 
   return (
     <div style={{ marginTop: -24 }}>
       {/* Sticky filter header */}
       <div style={{ position: 'sticky', top: FIXED_H, zIndex: 18, background: 'var(--bg)', paddingTop: 8, paddingBottom: 8 }}>
-        <div className="flex gap-1 rounded-xl p-1" style={{ background: 'var(--elevated)', border: '1px solid var(--border)' }}>
+        <div className="lg:flex lg:items-center lg:gap-3">
+        <div className="flex gap-1 rounded-xl p-1 lg:w-[380px] lg:shrink-0" style={{ background: 'var(--elevated)', border: '1px solid var(--border)' }}>
           {TIME_FILTERS.map(f => (
             <button
               key={f.key}
               onClick={() => { setTimeFilter(f.key); setOpponentFilter(null) }}
-              className="flex-1 rounded-lg py-1.5 text-xs font-medium transition-all"
+              className="ss-chip flex-1 rounded-lg py-1.5 text-xs font-medium"
               style={timeFilter === f.key ? {
                 background: 'color-mix(in srgb, var(--accent) 15%, transparent)',
                 color: 'var(--accent)',
@@ -261,10 +314,10 @@ export default function VSStats({ session, oilFilter, theme, bucketSize: bucketS
         </div>
 
         {opponentStats.length > 0 && (
-          <div className="flex gap-2 overflow-x-auto pb-0.5 -mx-1 px-1 mt-2">
+          <div className="flex gap-2 overflow-x-auto pb-0.5 -mx-1 px-1 mt-2 lg:mt-0 lg:flex-1 lg:min-w-0">
             <button
               onClick={() => setOpponentFilter(null)}
-              className="shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-all"
+              className="ss-chip shrink-0 rounded-full px-3 py-1 text-xs font-medium"
               style={!opponentFilter ? { background: 'var(--accent)', color: 'var(--acc-text)' } : {
                 background: 'var(--elevated)', color: 'var(--sub)', border: '1px solid var(--border)',
               }}
@@ -278,7 +331,7 @@ export default function VSStats({ session, oilFilter, theme, bucketSize: bucketS
                 <button
                   key={s.profile?.id}
                   onClick={() => setOpponentFilter(prev => prev === s.profile?.id ? null : s.profile?.id)}
-                  className="shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-all"
+                  className="ss-chip shrink-0 rounded-full px-3 py-1 text-xs font-medium"
                   style={isActive ? { background: 'var(--accent)', color: 'var(--acc-text)' } : {
                     background: 'var(--elevated)', color: 'var(--sub)', border: '1px solid var(--border)',
                   }}
@@ -289,6 +342,7 @@ export default function VSStats({ session, oilFilter, theme, bucketSize: bucketS
             })}
           </div>
         )}
+        </div>
       </div>
 
       {/* Body */}
@@ -305,7 +359,31 @@ export default function VSStats({ session, oilFilter, theme, bucketSize: bucketS
       )}
 
       {!loading && hasMatches && filtered.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}>
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2" style={{ marginTop: 4 }}>
+
+          {/* Desktop — summary ribbon + opponent leaderboard + focused-opponent section */}
+          {desktop && (
+            <>
+              <div className="lg:col-span-2"><VSSummaryRibbon summary={desktop.summary} /></div>
+              {opponentStats.length > 0 && (
+                <div className="lg:col-span-2">
+                  <OpponentLeaderboard
+                    opponentStats={opponentStats}
+                    activeId={opponentFilter}
+                    onSelect={id => setOpponentFilter(prev => prev === id ? null : id)}
+                  />
+                </div>
+              )}
+              {opponentFilter && h2h && desktop.h2hFull && (
+                <>
+                  {h2hCard}
+                  <H2HTableCard me={desktop.h2hFull.me} them={desktop.h2hFull.them} oppName={activeOpponentName} />
+                  <OpponentTimelineCard timeline={desktop.timeline} colors={colors} oppName={activeOpponentName} />
+                  <NetRecordCard timeline={desktop.timeline} colors={colors} />
+                </>
+              )}
+            </>
+          )}
 
           {/* Chart 1 — Score-Range Result Stack + Win% */}
           <ChartCard
@@ -396,33 +474,11 @@ export default function VSStats({ session, oilFilter, theme, bucketSize: bucketS
             </ResponsiveContainer>
           </ChartCard>
 
-          {/* Chart 5 — Head-to-Head Comparison (requires an opponent selected) */}
-          <ChartCard title="HEAD-TO-HEAD COMPARISON">
-            {!opponentFilter && (
-              <div style={{ textAlign: 'center', paddingTop: 4, paddingBottom: 20, fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: 'var(--sub)' }}>
-                Select an opponent above to compare
-              </div>
-            )}
-            {opponentFilter && h2h && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingLeft: 16, paddingRight: 16 }}>
-                <AvgScoreCompare myAvg={h2h.myAvg} oppAvg={h2h.oppAvg} oppName={activeOpponentName} />
-                <ResponsiveContainer width="100%" height={140}>
-                  <BarChart data={h2h.diverging} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={colors.border} strokeOpacity={0.6} horizontal={false} />
-                    <XAxis type="number" domain={[-100, 100]} tickFormatter={v => `${Math.abs(v)}%`} tick={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fill: colors.sub }} axisLine={false} tickLine={false} />
-                    <YAxis type="category" dataKey="label" tick={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fill: colors.text }} axisLine={false} tickLine={false} width={90} />
-                    <Tooltip content={<DivergingTooltip oppName={activeOpponentName} />} cursor={{ fill: 'transparent' }} />
-                    <Bar dataKey="me"  fill={colors.accent} radius={[3, 0, 0, 3]} isAnimationActive={false} />
-                    <Bar dataKey="opp" fill={colors.sub}    radius={[0, 3, 3, 0]} fillOpacity={0.6} isAnimationActive={false} />
-                  </BarChart>
-                </ResponsiveContainer>
-                <div style={{ display: 'flex', gap: 12, justifyContent: 'center', paddingBottom: 6 }}>
-                  <LegendDot color={colors.accent} label="YOU" />
-                  <LegendDot color={colors.sub} label={activeOpponentName.toUpperCase()} />
-                </div>
-              </div>
-            )}
-          </ChartCard>
+          {desktop && <FrameLeadCard data={desktop.lead} colors={colors} />}
+          {desktop && <WinLossCard profile={desktop.winLoss} colors={colors} />}
+
+          {/* Chart 5 — on mobile always last; on desktop it moves up beside the H2H table when an opponent is focused */}
+          {!desktop && h2hCard}
 
         </div>
       )}

@@ -85,6 +85,8 @@ const NAV_ITEMS = [
   },
 ]
 
+// Pages that widen on desktop to fit multi-column chart grids; all others keep the mobile width.
+const WIDE_PAGES = new Set(['stats', 'vs-stats'])
 
 function NavItem({ item, isActive, onClick, vsUnreadCount }) {
   return (
@@ -410,7 +412,7 @@ export default function Layout({ session }) {
 
       {/* ── Page content ── */}
       <main className="pt-14 md:ml-64">
-        <div className="mx-auto max-w-2xl px-4 pt-6 pb-24 md:px-6 md:pb-6">
+        <div className={`mx-auto px-4 pt-6 pb-24 md:px-6 md:pb-6 ${WIDE_PAGES.has(activePage) ? 'max-w-2xl lg:max-w-6xl' : 'max-w-2xl'}`}>
           {activePage === 'my-games' && (
             <MyGames session={session} oilFilter={oilFilter} refreshKey={refreshKey} onOpenUpload={openUpload} cardPreview={cardPreview} />
           )}
