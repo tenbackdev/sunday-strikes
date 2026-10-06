@@ -9,6 +9,8 @@ import Admin from './Admin'
 import VSSubmitModal from './VSSubmitModal'
 import UserMenu from './UserMenu'
 import SettingsModal from './SettingsModal'
+import OilToggle from './OilToggle'
+import { OIL_FILTERS, loadOilFilter, saveOilFilter } from '../lib/oilType'
 
 const NAV_ITEMS = [
   {
@@ -165,6 +167,12 @@ export default function Layout({ session }) {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [theme, setTheme] = useState(() => localStorage.getItem('ss-theme') || 'classic')
   const [cardPreview, setCardPreview] = useState(() => localStorage.getItem('ss_card_preview') ?? 'frames')
+  const [oilFilter, setOilFilter] = useState(loadOilFilter)
+
+  function changeOilFilter(value) {
+    setOilFilter(value)
+    saveOilFilter(value)
+  }
 
   // Apply theme class to <html>
   useEffect(() => {
@@ -369,15 +377,20 @@ export default function Layout({ session }) {
 
         <div className="hidden md:block" />
 
-        <UserMenu
-          session={session}
-          theme={theme}
-          onThemeChange={handleThemeChange}
-          cardPreview={cardPreview}
-          onCardPreviewChange={handleCardPreviewChange}
-          onProfileSave={handleUserMenuSave}
-          profileAvatarColor={profile?.avatar_color ?? null}
-        />
+        <div className="flex items-center gap-2 md:gap-3">
+          {activePage !== 'find-friends' && activePage !== 'admin' && (
+            <OilToggle value={oilFilter} onChange={changeOilFilter} options={OIL_FILTERS} size="sm" ariaLabel="Filter by oil type" />
+          )}
+          <UserMenu
+            session={session}
+            theme={theme}
+            onThemeChange={handleThemeChange}
+            cardPreview={cardPreview}
+            onCardPreviewChange={handleCardPreviewChange}
+            onProfileSave={handleUserMenuSave}
+            profileAvatarColor={profile?.avatar_color ?? null}
+          />
+        </div>
       </header>
 
       {/* ── Mobile FAB ── */}
@@ -399,12 +412,12 @@ export default function Layout({ session }) {
       <main className="pt-14 md:ml-64">
         <div className="mx-auto max-w-2xl px-4 pt-6 pb-24 md:px-6 md:pb-6">
           {activePage === 'my-games' && (
-            <MyGames session={session} refreshKey={refreshKey} onOpenUpload={openUpload} cardPreview={cardPreview} />
+            <MyGames session={session} oilFilter={oilFilter} refreshKey={refreshKey} onOpenUpload={openUpload} cardPreview={cardPreview} />
           )}
           {activePage === 'find-friends' && <FindFriends session={session} />}
-          {activePage === 'vs-matches' && <VSMatches session={session} />}
-          {activePage === 'vs-stats' && <VSStats session={session} theme={theme} bucketSize={profile?.score_bucket_size} />}
-          {activePage === 'stats' && <Stats session={session} theme={theme} bucketSize={profile?.score_bucket_size} />}
+          {activePage === 'vs-matches' && <VSMatches session={session} oilFilter={oilFilter} />}
+          {activePage === 'vs-stats' && <VSStats session={session} oilFilter={oilFilter} theme={theme} bucketSize={profile?.score_bucket_size} />}
+          {activePage === 'stats' && <Stats session={session} oilFilter={oilFilter} theme={theme} bucketSize={profile?.score_bucket_size} />}
           {activePage === 'admin' && <Admin session={session} />}
         </div>
       </main>

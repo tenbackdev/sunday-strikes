@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import { computeStats, computeLeaveMetrics, countRacks } from '../lib/parseGame'
+import { applyOilFilter, oilLabel } from '../lib/oilType'
 import { AMBER, getScoreBuckets, bucketAxisProps, normalizeBucketSize, MIN_TREND_SAMPLE, getChartColors, toLocalDateStr } from '../lib/chartFormat'
 import { LegendDot, ChartCard, Ribbon } from '../lib/chartUtils'
 import {
@@ -225,16 +226,17 @@ function RollingSplitTooltip({ active, payload, label }) {
 }
 
 
-function EmptyState() {
+function EmptyState({ oilFilter }) {
+  const oil = oilFilter && oilFilter !== 'all' ? `${oilLabel(oilFilter)} ` : ''
   return (
     <div className="flex flex-col items-center justify-center rounded-2xl py-16 mt-6" style={{ border: '2px dashed var(--border)' }}>
-      <p className="text-sm font-medium" style={{ color: 'var(--sub)' }}>No games in this period</p>
+      <p className="text-sm font-medium" style={{ color: 'var(--sub)' }}>No {oil}games in this period</p>
       <p className="mt-1 text-xs" style={{ color: 'color-mix(in srgb, var(--sub) 60%, transparent)' }}>Try a wider time range</p>
     </div>
   )
 }
 
-export default function Stats({ session, theme, bucketSize: bucketSizeProp }) {
+export default function Stats({ session, oilFilter, theme, bucketSize: bucketSizeProp }) {
   const bucketSize = normalizeBucketSize(bucketSizeProp)
   const [timeFilter, setTimeFilter] = useState(() => localStorage.getItem('ss_stats_time_filter') ?? localStorage.getItem('ss_trends_time_filter') ?? 'all')
   const [statsTab,   setStatsTab]   = useState('overview')
@@ -251,7 +253,7 @@ export default function Stats({ session, theme, bucketSize: bucketSizeProp }) {
     async function load() {
       setIsLoading(true)
       const now = new Date()
-      let q = supabase.from('games').select('*').eq('user_id', session.user.id).order('played_at', { ascending: false })
+      let q = applyOilFilter(supabase.from('games').select('*').eq('user_id', session.user.id), oilFilter).order('played_at', { ascending: false })
       if (timeFilter === 'year') q = q.gte('played_at', new Date(now.getFullYear(), 0, 1).toISOString())
       else if (timeFilter === '3mo') q = q.gte('played_at', new Date(now - 90 * 86400000).toISOString())
       else if (timeFilter === '30d') q = q.gte('played_at', new Date(now - 30 * 86400000).toISOString())
@@ -263,7 +265,7 @@ export default function Stats({ session, theme, bucketSize: bucketSizeProp }) {
     }
     load()
     return () => { cancelled = true }
-  }, [timeFilter, session.user.id])
+  }, [timeFilter, oilFilter, session.user.id])
 
   function changeTimeFilter(key) {
     setTimeFilter(key)
@@ -680,7 +682,7 @@ export default function Stats({ session, theme, bucketSize: bucketSizeProp }) {
       {/* ── Overview tab ── */}
       {!isLoading && statsTab === 'overview' && (
         <>
-          {!hasGames && <EmptyState />}
+          {!hasGames && <EmptyState oilFilter={oilFilter} />}
           {hasGames && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}>
 
@@ -806,7 +808,7 @@ export default function Stats({ session, theme, bucketSize: bucketSizeProp }) {
       {/* ── Strikes tab ── */}
       {!isLoading && statsTab === 'strikes' && (
         <>
-          {!hasGames && <EmptyState />}
+          {!hasGames && <EmptyState oilFilter={oilFilter} />}
           {hasGames && strikesData && (() => {
             const sTickInterval = strikesData.strikesByDay.length > 20
               ? Math.ceil(strikesData.strikesByDay.length / 10) - 1
@@ -972,7 +974,7 @@ export default function Stats({ session, theme, bucketSize: bucketSizeProp }) {
       {/* ── Spares tab ── */}
       {!isLoading && statsTab === 'spares' && (
         <>
-          {!hasGames && <EmptyState />}
+          {!hasGames && <EmptyState oilFilter={oilFilter} />}
           {hasGames && sparesData && (() => {
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}>
@@ -1143,7 +1145,7 @@ export default function Stats({ session, theme, bucketSize: bucketSizeProp }) {
       {/* ── Pins tab ── */}
       {!isLoading && statsTab === 'pins' && (
         <>
-          {!hasGames && <EmptyState />}
+          {!hasGames && <EmptyState oilFilter={oilFilter} />}
           {hasGames && pinsData && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}>
 

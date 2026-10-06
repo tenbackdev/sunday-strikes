@@ -5,6 +5,8 @@ import { computeStats, computeScores } from '../lib/parseGame'
 import { sanitizeFrames } from '../lib/validateFrames'
 import { StatTable, EditableFrameGrid, MiniGrid, StatStrip, ParseWarningBanner } from './Scorecard'
 import { loadUploadPrefs, saveUploadPrefs } from '../lib/uploadPrefs'
+import OilToggle from './OilToggle'
+import { applyOilFilter, oilLabel } from '../lib/oilType'
 
 // ── Shared modal shell ───────────────────────────────────────────────────────
 
@@ -366,6 +368,11 @@ function GameCard({ game, open, onToggle, onEdit, onDelete, vsResult, isPB, prev
                   {game.player_label}
                 </span>
               )}
+              {game.oil_type === 'sport' && (
+                <span style={{ padding: '1px 5px', borderRadius: 4, border: `1px solid ${W_LINE}`, color: 'var(--sub)', fontWeight: 700, letterSpacing: '0.06em' }}>
+                  SPORT
+                </span>
+              )}
             </div>
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -510,6 +517,7 @@ export function UploadModal({ session, profile, onClose, onSaved }) {
     const prefs = loadUploadPrefs()
     return prefs?.myPlayerLabel ?? profile?.player_label ?? ''
   })
+  const [oilType, setOilType] = useState(() => loadUploadPrefs()?.oilType ?? 'house')
   const [playedAt, setPlayedAt] = useState(() => {
     const now = new Date()
     now.setMinutes(now.getMinutes() - now.getTimezoneOffset())
@@ -589,6 +597,7 @@ export function UploadModal({ session, profile, onClose, onSaved }) {
         total_score: totalScore,
         player_label: playerLabel.trim(),
         frames: parsedData.frames,
+        oil_type: oilType,
         ...(framesEdited ? { ai_frames: aiFrames } : {}),
       })
       .select()
@@ -600,7 +609,7 @@ export function UploadModal({ session, profile, onClose, onSaved }) {
       return
     }
 
-    saveUploadPrefs({ myPlayerLabel: playerLabel.trim() })
+    saveUploadPrefs({ myPlayerLabel: playerLabel.trim(), oilType })
     onSaved(data)
     onClose()
   }
@@ -664,6 +673,10 @@ export function UploadModal({ session, profile, onClose, onSaved }) {
         <div>
           <label className="mb-1 block text-xs font-medium" style={{ color: 'var(--sub)' }}>Your label on screen</label>
           <LabelChip value={playerLabel} onChange={setPlayerLabel} placeholder="A" />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium" style={{ color: 'var(--sub)' }}>Oil</label>
+          <OilToggle value={oilType} onChange={setOilType} />
         </div>
         <DateTimeDisclosure playedAt={playedAt} setPlayedAt={setPlayedAt} />
       </div>
@@ -730,6 +743,7 @@ export function UploadModal({ session, profile, onClose, onSaved }) {
 function EditGameModal({ game, onClose, onSaved }) {
   const [frames, setFrames] = useState(() => computeScores(JSON.parse(JSON.stringify(game.frames))))
   const [playerLabel, setPlayerLabel] = useState(game.player_label ?? '')
+  const [oilType, setOilType] = useState(game.oil_type ?? 'house')
   const [playedAt, setPlayedAt] = useState(() => {
     const d = new Date(game.played_at)
     d.setMinutes(d.getMinutes() - d.getTimezoneOffset())
@@ -764,6 +778,7 @@ function EditGameModal({ game, onClose, onSaved }) {
         total_score: totalScore,
         player_label: playerLabel.trim(),
         frames,
+        oil_type: oilType,
         ...(shouldSetAiFrames ? { ai_frames: originalFrames } : {}),
       })
       .eq('id', game.id)
@@ -796,6 +811,11 @@ function EditGameModal({ game, onClose, onSaved }) {
           <label className="mb-1 block text-xs font-medium" style={{ color: 'var(--sub)' }}>Date &amp; time played</label>
           <ThemedInput type="datetime-local" value={playedAt} onChange={e => setPlayedAt(e.target.value)} />
         </div>
+      </div>
+
+      <div className="mb-3">
+        <label className="mb-1 block text-xs font-medium" style={{ color: 'var(--sub)' }}>Oil</label>
+        <OilToggle value={oilType} onChange={setOilType} />
       </div>
 
       <div className="mb-3">
@@ -868,7 +888,7 @@ function monthKeyToDate(key) {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
-export default function MyGames({ session, refreshKey = 0, onOpenUpload, cardPreview = 'frames' }) {
+export default function MyGames({ session, oilFilter = 'all', refreshKey = 0, onOpenUpload, cardPreview = 'frames' }) {
   // Lightweight metadata for ALL games — used for ribbon stats and PB set.
   // Does not include frames JSON, so it's fast even with thousands of games.
   const [allMeta, setAllMeta] = useState([])
@@ -939,10 +959,10 @@ export default function MyGames({ session, refreshKey = 0, onOpenUpload, cardPre
   // ── Fetch helpers ────────────────────────────────────────────────────────────
 
   async function fetchAllMeta() {
-    const { data } = await supabase
+    const { data } = await applyOilFilter(supabase
       .from('games')
-      .select('id, total_score, played_at, is_vs, vs_match_id, frames')
-      .eq('user_id', session.user.id)
+      .select('id, total_score, played_at, is_vs, vs_match_id, frames, oil_type')
+      .eq('user_id', session.user.id), oilFilter)
       .order('played_at', { ascending: false })
     return data ?? []
   }
@@ -950,10 +970,10 @@ export default function MyGames({ session, refreshKey = 0, onOpenUpload, cardPre
   async function fetchMonthGames(year, month) {
     const start = new Date(year, month, 1).toISOString()
     const end   = new Date(year, month + 1, 1).toISOString()
-    const { data } = await supabase
+    const { data } = await applyOilFilter(supabase
       .from('games')
       .select('*')
-      .eq('user_id', session.user.id)
+      .eq('user_id', session.user.id), oilFilter)
       .gte('played_at', start)
       .lt('played_at', end)
       .order('played_at', { ascending: false })
@@ -962,7 +982,7 @@ export default function MyGames({ session, refreshKey = 0, onOpenUpload, cardPre
 
   async function fetchFilteredGames(filter) {
     const now = new Date()
-    let query = supabase.from('games').select('*').eq('user_id', session.user.id).order('played_at', { ascending: false })
+    let query = applyOilFilter(supabase.from('games').select('*').eq('user_id', session.user.id), oilFilter).order('played_at', { ascending: false })
     if (filter === 'year') query = query.gte('played_at', new Date(now.getFullYear(), 0, 1).toISOString())
     else if (filter === '3mo') query = query.gte('played_at', new Date(now - 90 * 86400000).toISOString())
     else if (filter === '30d') query = query.gte('played_at', new Date(now - 30 * 86400000).toISOString())
@@ -1017,6 +1037,7 @@ export default function MyGames({ session, refreshKey = 0, onOpenUpload, cardPre
   // ── Initial load ─────────────────────────────────────────────────────────────
 
   useEffect(() => {
+    let cancelled = false
     setInitialLoading(true)
     setAllTimeGames([])
     setFilterGames([])
@@ -1026,6 +1047,7 @@ export default function MyGames({ session, refreshKey = 0, onOpenUpload, cardPre
 
     async function init() {
       const meta = await fetchAllMeta()
+      if (cancelled) return
       setAllMeta(meta)
 
       // Seed with every calendar month that overlaps the last 30 days.
@@ -1045,6 +1067,7 @@ export default function MyGames({ session, refreshKey = 0, onOpenUpload, cardPre
           return fetchMonthGames(y, m)
         })
       )
+      if (cancelled) return
       const monthGames = fetched.flat().sort((a, b) => new Date(b.played_at) - new Date(a.played_at))
 
       setAllTimeGames(monthGames)
@@ -1055,21 +1078,25 @@ export default function MyGames({ session, refreshKey = 0, onOpenUpload, cardPre
     }
 
     init()
-  }, [refreshKey])
+    return () => { cancelled = true }
+  }, [refreshKey, oilFilter])
 
   // ── Filter change: fetch bounded sets server-side ────────────────────────────
 
   useEffect(() => {
     if (timeFilter === 'all') return
+    let cancelled = false
     setFilterLoading(true)
     setFilterGames([])
 
     fetchFilteredGames(timeFilter).then(async games => {
+      if (cancelled) return
       setFilterGames(games)
       setFilterLoading(false)
       await loadVsDataForGames(games)
     })
-  }, [timeFilter])
+    return () => { cancelled = true }
+  }, [timeFilter, oilFilter])
 
   // ── Load next month (called by sentinel observer) ────────────────────────────
 
@@ -1175,12 +1202,20 @@ export default function MyGames({ session, refreshKey = 0, onOpenUpload, cardPre
   }
 
   function handleGameUpdated(updatedGame) {
+    // An oil type edit can move the game out of the active oil filter
+    if (oilFilter !== 'all' && updatedGame.oil_type !== oilFilter) {
+      setAllTimeGames(prev => prev.filter(g => g.id !== updatedGame.id))
+      setFilterGames(prev => prev.filter(g => g.id !== updatedGame.id))
+      setAllMeta(prev => prev.filter(g => g.id !== updatedGame.id))
+      if (openGameId === updatedGame.id) setOpenGameId(null)
+      return
+    }
     const patch = g => g.id === updatedGame.id ? updatedGame : g
     setAllTimeGames(prev => prev.map(patch))
     setFilterGames(prev => prev.map(patch))
     setAllMeta(prev => prev.map(g =>
       g.id === updatedGame.id
-        ? { ...g, total_score: updatedGame.total_score, played_at: updatedGame.played_at }
+        ? { ...g, total_score: updatedGame.total_score, played_at: updatedGame.played_at, frames: updatedGame.frames, oil_type: updatedGame.oil_type }
         : g
     ))
   }
@@ -1401,6 +1436,10 @@ export default function MyGames({ session, refreshKey = 0, onOpenUpload, cardPre
       {/* Game list */}
       {isLoading ? (
         <div className="flex justify-center py-16 text-sm" style={{ color: 'var(--sub)' }}>Loading games…</div>
+      ) : !hasAnyGames && oilFilter !== 'all' ? (
+        <div className="flex justify-center py-10 text-sm mt-6" style={{ color: 'var(--sub)' }}>
+          No {oilLabel(oilFilter)} games yet
+        </div>
       ) : !hasAnyGames ? (
         <div className="flex flex-col items-center justify-center rounded-2xl py-16 mt-6" style={{ border: '2px dashed var(--border)' }}>
           <p className="text-sm font-medium" style={{ color: 'var(--sub)' }}>No games recorded yet</p>
@@ -1417,7 +1456,7 @@ export default function MyGames({ session, refreshKey = 0, onOpenUpload, cardPre
         <div className="flex justify-center py-16 text-sm" style={{ color: 'var(--sub)' }}>Loading…</div>
       ) : displayGames.length === 0 ? (
         <div className="flex justify-center py-10 text-sm mt-6" style={{ color: 'var(--sub)' }}>
-          No games in this period
+          No {oilFilter !== 'all' ? `${oilLabel(oilFilter)} ` : ''}games in this period
         </div>
       ) : (
         <div style={{ marginTop: 8 }}>

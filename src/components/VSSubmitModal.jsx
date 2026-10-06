@@ -6,6 +6,7 @@ import { sanitizeFrames } from '../lib/validateFrames'
 import { StatTable, FrameGrid, EditableFrameGrid, ParseWarningBanner } from './Scorecard'
 import { avatarStyle } from '../lib/avatar'
 import { loadUploadPrefs, saveUploadPrefs, loadOpponentPref, saveOpponentPref } from '../lib/uploadPrefs'
+import OilToggle from './OilToggle'
 
 function defaultPlayedAt() {
   const now = new Date()
@@ -445,7 +446,7 @@ function LabelChip({ value, onChange, placeholder }) {
 
 // ── Setup step (opponent + datetime, merged) ──────────────────────────────────
 
-function SetupStep({ friends, loadingFriends, selectedFriend, setSelectedFriend, playedAt, setPlayedAt, onNext, myPlayerLabel, oppPlayerLabel }) {
+function SetupStep({ friends, loadingFriends, selectedFriend, setSelectedFriend, playedAt, setPlayedAt, oilType, setOilType, onNext, myPlayerLabel, oppPlayerLabel }) {
   const [showDateEdit, setShowDateEdit] = useState(false)
 
   const formattedTime = (() => {
@@ -511,6 +512,11 @@ function SetupStep({ friends, loadingFriends, selectedFriend, setSelectedFriend,
         </div>
       )}
 
+      <div>
+        <label className="mb-1 block text-xs font-medium" style={{ color: 'var(--sub)' }}>Oil</label>
+        <OilToggle value={oilType} onChange={setOilType} />
+      </div>
+
       {/* Datetime disclosure */}
       <div className="rounded-lg px-3 py-2.5" style={{ background: 'var(--elevated)', border: '1px solid var(--border)' }}>
         {showDateEdit ? (
@@ -550,6 +556,7 @@ export default function VSSubmitModal({ session, onClose, onSaved }) {
   const [myParsedData, setMyParsedData] = useState(null)
   const [myAiFrames, setMyAiFrames] = useState(null)
   const [myPlayerLabel, setMyPlayerLabel] = useState(() => loadUploadPrefs()?.myPlayerLabel ?? '')
+  const [oilType, setOilType] = useState(() => loadUploadPrefs()?.oilType ?? 'house')
   const [myPhase, setMyPhase] = useState('input')
   const [myError, setMyError] = useState(null)
 
@@ -627,11 +634,11 @@ export default function VSSubmitModal({ session, onClose, onSaved }) {
     const oppFramesEdited = oppAiFrames && JSON.stringify(oppParsedData.frames) !== JSON.stringify(oppAiFrames)
     const { data, error } = await supabase.rpc('create_vs_match', {
       p_submitter_game: {
-        total_score: myScore, player_label: myPlayerLabel.trim(), frames: myParsedData.frames,
+        total_score: myScore, player_label: myPlayerLabel.trim(), frames: myParsedData.frames, oil_type: oilType,
         ...(myFramesEdited ? { ai_frames: myAiFrames } : {}),
       },
       p_opponent_game: {
-        total_score: oppScore, player_label: oppPlayerLabel.trim(), frames: oppParsedData.frames,
+        total_score: oppScore, player_label: oppPlayerLabel.trim(), frames: oppParsedData.frames, oil_type: oilType,
         ...(oppFramesEdited ? { ai_frames: oppAiFrames } : {}),
       },
       p_opponent_id: selectedFriend.id,
@@ -639,12 +646,12 @@ export default function VSSubmitModal({ session, onClose, onSaved }) {
     })
     if (error) { setSaveError('Failed to save match: ' + error.message); setSaving(false); return }
     saveOpponentPref(selectedFriend)
-    saveUploadPrefs({ myPlayerLabel: myPlayerLabel.trim(), oppPlayerLabel: oppPlayerLabel.trim(), photoMode })
+    saveUploadPrefs({ myPlayerLabel: myPlayerLabel.trim(), oppPlayerLabel: oppPlayerLabel.trim(), photoMode, oilType })
     onSaved({
       submitterGame: {
         id: data.submitter_game_id, user_id: session.user.id, played_at: new Date(playedAt).toISOString(),
         total_score: myScore, player_label: myPlayerLabel.trim(), ...computeStats(myParsedData.frames),
-        frames: myParsedData.frames, is_vs: true, vs_match_id: data.vs_match_id,
+        frames: myParsedData.frames, oil_type: oilType, is_vs: true, vs_match_id: data.vs_match_id,
         ...(myFramesEdited ? { ai_frames: myAiFrames } : {}),
       },
       vsMatch: { id: data.vs_match_id, submitter_game_id: data.submitter_game_id, opponent_game_id: data.opponent_game_id },
@@ -726,6 +733,8 @@ export default function VSSubmitModal({ session, onClose, onSaved }) {
             setSelectedFriend={setSelectedFriend}
             playedAt={playedAt}
             setPlayedAt={setPlayedAt}
+            oilType={oilType}
+            setOilType={setOilType}
             onNext={() => setStep(2)}
             myPlayerLabel={myPlayerLabel}
             oppPlayerLabel={oppPlayerLabel}

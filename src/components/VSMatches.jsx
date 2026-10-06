@@ -3,6 +3,7 @@ import { FrameGrid } from './Scorecard'
 import { computeStats, isConvertedSplit } from '../lib/parseGame'
 import { avatarStyle } from '../lib/avatar'
 import { useVsMatches } from '../lib/useVsMatches'
+import { matchesOil, oilLabel } from '../lib/oilType'
 import { groupByOpponent } from '../lib/vsAggregates'
 
 const FIXED_H = 56
@@ -284,7 +285,7 @@ function OpponentCard({ stats, onFilter, isActive, statView, onStatViewChange })
   )
 }
 
-export default function VSMatches({ session }) {
+export default function VSMatches({ session, oilFilter }) {
   const { matches, loading } = useVsMatches(session)
   const [timeFilter, setTimeFilter] = useState('all')
   const [opponentFilter, setOpponentFilter] = useState(null)
@@ -293,6 +294,7 @@ export default function VSMatches({ session }) {
 
   const now = new Date()
   const timeFiltered = matches.filter(m => {
+    if (!matchesOil(m.myGame, oilFilter)) return false
     const d = new Date(m.played_at)
     if (timeFilter === 'year') return d.getFullYear() === now.getFullYear()
     if (timeFilter === '3mo') return d >= new Date(now - 90 * 86400000)
@@ -448,7 +450,7 @@ export default function VSMatches({ session }) {
                 )}
               </div>
               {filtered.length === 0 ? (
-                <p className="py-8 text-center text-sm" style={{ color: 'var(--sub)' }}>No matches in this range</p>
+                <p className="py-8 text-center text-sm" style={{ color: 'var(--sub)' }}>No {oilFilter && oilFilter !== 'all' ? `${oilLabel(oilFilter)} ` : ''}matches in this range</p>
               ) : (
                 <div className="space-y-4">
                   {matchDateGroups.map(({ date, matches: dayMatches }) => (

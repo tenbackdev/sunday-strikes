@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useVsMatches } from '../lib/useVsMatches'
+import { matchesOil, oilLabel } from '../lib/oilType'
 import { groupByOpponent } from '../lib/vsAggregates'
 import { computeStats, countRacks } from '../lib/parseGame'
 import { getScoreBuckets, bucketAxisProps, normalizeBucketSize, MIN_TREND_SAMPLE, getChartColors } from '../lib/chartFormat'
@@ -147,7 +148,7 @@ function AvgScoreCompare({ myAvg, oppAvg, oppName }) {
   )
 }
 
-export default function VSStats({ session, theme, bucketSize: bucketSizeProp }) {
+export default function VSStats({ session, oilFilter, theme, bucketSize: bucketSizeProp }) {
   const bucketSize = normalizeBucketSize(bucketSizeProp)
   const { matches, loading } = useVsMatches(session)
   const [timeFilter, setTimeFilter] = useState('all')
@@ -159,13 +160,14 @@ export default function VSStats({ session, theme, bucketSize: bucketSizeProp }) 
   const timeFiltered = useMemo(() => {
     const now = new Date()
     return matches.filter(m => {
+      if (!matchesOil(m.myGame, oilFilter)) return false
       const d = new Date(m.played_at)
       if (timeFilter === 'year') return d.getFullYear() === now.getFullYear()
       if (timeFilter === '3mo') return d >= new Date(now - 90 * 86400000)
       if (timeFilter === '30d') return d >= new Date(now - 30 * 86400000)
       return true
     })
-  }, [matches, timeFilter])
+  }, [matches, timeFilter, oilFilter])
 
   const filtered = useMemo(
     () => timeFiltered.filter(m => !opponentFilter || m.opponentProfile?.id === opponentFilter),
@@ -299,7 +301,7 @@ export default function VSStats({ session, theme, bucketSize: bucketSizeProp }) 
       )}
 
       {!loading && hasMatches && filtered.length === 0 && (
-        <EmptyState message="No matches in this range" />
+        <EmptyState message={`No ${oilFilter && oilFilter !== 'all' ? `${oilLabel(oilFilter)} ` : ''}matches in this range`} />
       )}
 
       {!loading && hasMatches && filtered.length > 0 && (

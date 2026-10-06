@@ -23,7 +23,7 @@ export function useVsMatches(session) {
 
     const [profilesRes, gamesRes] = await Promise.all([
       supabase.from('profiles').select('id, display_name, email, avatar_color').in('id', allUserIds),
-      supabase.from('games').select('id, user_id, total_score, frames').in('id', allGameIds),
+      supabase.from('games').select('id, user_id, total_score, frames, oil_type').in('id', allGameIds),
     ])
 
     const profileMap = Object.fromEntries((profilesRes.data || []).map(p => [p.id, p]))

@@ -11,7 +11,7 @@ function toLocalDateTimeStr(isoStr) {
 export async function fetchExportableGames(session) {
   const { data, error } = await supabase
     .from('games')
-    .select('id, played_at, player_label, total_score, frames, ai_frames, is_vs, vs_match_id')
+    .select('id, played_at, player_label, total_score, oil_type, frames, ai_frames, is_vs, vs_match_id')
     .eq('user_id', session.user.id)
     .order('played_at')
   if (error) throw error
@@ -30,6 +30,7 @@ export function buildGamesJSON(games) {
     played_at_local: toLocalDateTimeStr(game.played_at),
     player_label: game.player_label,
     total_score: game.total_score,
+    oil_type: game.oil_type,
     is_vs: game.is_vs,
     vs_match_id: game.vs_match_id,
     frames_edited: !!game.ai_frames,
@@ -47,7 +48,7 @@ function csvField(value) {
 
 export function buildFramesCSV(games) {
   const header = [
-    'game_id', 'played_at_utc', 'played_at_local', 'player_label', 'total_score',
+    'game_id', 'played_at_utc', 'played_at_local', 'player_label', 'total_score', 'oil_type',
     'is_vs', 'vs_match_id', 'frames_edited', 'frame_number',
     'ball_1', 'ball_2', 'ball_3', 'split', 'running_score',
   ]
@@ -64,6 +65,7 @@ export function buildFramesCSV(games) {
         playedAtLocal,
         game.player_label,
         game.total_score,
+        game.oil_type,
         game.is_vs,
         game.vs_match_id,
         framesEdited,
