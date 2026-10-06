@@ -538,7 +538,8 @@ export default function Stats({ session, theme, bucketSize: bucketSizeProp }) {
       }
       return {
         index:         i + 1,
-        splitConvRate: wSplits >= MIN_TREND_SAMPLE ? Math.round((wConv / wSplits) * 100) : null,
+        // Exempt from MIN_TREND_SAMPLE — splits are rare, so a 10-game window rarely has 10+
+        splitConvRate: wSplits > 0 ? Math.round((wConv / wSplits) * 100) : null,
         windowSplits:  wSplits,
       }
     })
